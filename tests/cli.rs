@@ -96,6 +96,30 @@ fn perft_command_rejects_a_malformed_fen() {
 }
 
 #[test]
+fn perft_command_rejects_a_missing_depth() {
+    let output = Command::new(env!("CARGO_BIN_EXE_zugzwang"))
+        .args(["perft"])
+        .output()
+        .expect("failed to run binary");
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("usage"));
+}
+
+#[test]
+fn perft_command_rejects_a_non_numeric_depth() {
+    let output = Command::new(env!("CARGO_BIN_EXE_zugzwang"))
+        .args(["perft", "deep"])
+        .output()
+        .expect("failed to run binary");
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("usage"));
+}
+
+#[test]
 fn play_mode_rejects_an_illegal_move_then_plays_a_legal_one() {
     let mut child = Command::new(env!("CARGO_BIN_EXE_zugzwang"))
         .arg("play")
