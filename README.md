@@ -14,21 +14,26 @@ search algorithm (minimax + alpha-beta pruning + a transposition table), real mo
 heuristics, and a real protocol implementation, so it can actually sit behind a GUI and play a
 game start to finish. That's the difference between a toy and an engine.
 
-## What it does (planned)
+## What it does
 
-- **Board representation** — bitboard-based board state with fast make/unmake move.
 - **Move generation** — fully legal move generation for all pieces, including castling, en
-  passant, and promotion, validated against perft test positions.
-- **Search** — minimax with alpha-beta pruning, iterative deepening, and a transposition table
-  keyed by Zobrist hashing.
-- **Evaluation** — material + piece-square tables to start, with room to grow (mobility, king
-  safety, pawn structure).
-- **Move ordering** — MVV-LVA capture ordering, killer moves, and history heuristics to make
-  alpha-beta pruning effective.
-- **UCI protocol** — a `uci` binary that speaks the Universal Chess Interface over stdin/stdout,
-  so any UCI-compatible GUI can drive it.
-- **Terminal play** — a minimal CLI mode for playing a game directly in the terminal without a
-  GUI.
+  passant, and promotion, validated against perft test positions through depth 5 (starting
+  position and the "Kiwipete" position).
+- **Search** — negamax with alpha-beta pruning and iterative deepening against a configurable
+  time budget.
+- **Move ordering** — MVV-LVA capture ordering, killer moves, and a history heuristic, so
+  alpha-beta pruning cuts off effectively.
+- **Evaluation** — material only so far; piece-square tables and quiescence search are next.
+- **UCI protocol** — `uci` mode speaks the Universal Chess Interface (`uci`, `isready`,
+  `ucinewgame`, `position`, `go` with `movetime`/`wtime`/`btime`/`movestogo`, `stop`, `quit`)
+  over stdin/stdout, so any UCI-compatible GUI can drive it.
+- **Terminal play** — `play` mode for playing a full game directly in the terminal, no GUI
+  required.
+- **Perft debug command** — `perft <depth> [fen]` prints node counts per depth for validating
+  move generation against known-good positions.
+
+See [`docs/BACKLOG.md`](docs/BACKLOG.md) for what's not built yet (bitboards, a transposition
+table, quiescence search, piece-square tables).
 
 ## Stack
 
@@ -39,15 +44,24 @@ game start to finish. That's the difference between a toy and an engine.
 
 ## Status
 
-Early scope/planning stage. See [`docs/VISION.md`](docs/VISION.md) for the design and
+Core search and protocol are working end-to-end. See [`docs/VISION.md`](docs/VISION.md) for the
+design, [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the module map, and
 [`docs/BACKLOG.md`](docs/BACKLOG.md) for the build plan.
 
-## Building
+## Building and running
 
 ```sh
 cargo build --release
 cargo test
+
+./target/release/zugzwang          # print the starting position and exit
+./target/release/zugzwang uci      # UCI mode, for a chess GUI to drive over stdin/stdout
+./target/release/zugzwang play     # play a game against the engine in the terminal
+./target/release/zugzwang perft 5  # move generation node counts, depths 1..5
 ```
+
+Terminal play and UCI's `position ... moves ...` both take moves in coordinate algebraic
+notation (`e2e4`, `e7e8q` for a promotion) rather than SAN (`Nf3`).
 
 ## License
 
