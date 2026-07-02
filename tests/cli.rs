@@ -325,6 +325,44 @@ fn perft_command_rejects_a_non_numeric_depth() {
 }
 
 #[test]
+fn play_mode_accepts_a_custom_starting_fen() {
+    let output = Command::new(env!("CARGO_BIN_EXE_zugzwang"))
+        .args(["play", "4k3/8/8/8/8/8/8/4K3", "w", "-", "-", "0", "1"])
+        .output()
+        .expect("failed to run binary");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // A bare king vs king position is drawn immediately, before any move
+    // is even prompted for.
+    assert!(stdout.contains("Draw by insufficient material."));
+}
+
+#[test]
+fn play_mode_rejects_an_invalid_starting_fen() {
+    let output = Command::new(env!("CARGO_BIN_EXE_zugzwang"))
+        .args(["play", "not-a-fen"])
+        .output()
+        .expect("failed to run binary");
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("invalid FEN"));
+}
+
+#[test]
+fn play_mode_reports_checkmate_immediately_from_a_mated_starting_fen() {
+    let output = Command::new(env!("CARGO_BIN_EXE_zugzwang"))
+        .args(["play", "k7/Q7/1K6/8/8/8/8/8", "b", "-", "-", "0", "1"])
+        .output()
+        .expect("failed to run binary");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("Checkmate."));
+}
+
+#[test]
 fn play_mode_rejects_an_illegal_move_then_plays_a_legal_one() {
     let mut child = Command::new(env!("CARGO_BIN_EXE_zugzwang"))
         .arg("play")
