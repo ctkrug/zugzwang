@@ -34,8 +34,8 @@ src/
                 Table for the whole tree. Each node probes the TT before searching (an exact hit
                 at sufficient depth returns immediately; a bound hit narrows the window) and
                 stores its result after, skipping mate-adjacent scores since those are ply-
-                relative. Depth-0 leaves extend into quiescence (capture-only search) instead of
-                returning the raw eval, to avoid the horizon effect. find_best_move does
+                relative. Depth-0 leaves extend into quiescence (captures and promotions only,
+                to avoid the horizon effect) instead of returning the raw eval. find_best_move does
                 iterative deepening against a wall-clock budget; find_best_move_to_depth instead
                 iterates to an exact depth with no time limit, for a UCI `go depth` request.
   uci.rs        UCI command loop: uci/isready/ucinewgame/position/go/stop/quit. Tracks the
@@ -95,8 +95,8 @@ cargo fmt
   one that happens to land in the same bucket.
 - Zobrist hashing is recomputed from scratch per `hash()` call rather than updated incrementally
   inside `Board::make_move`, so it costs a full board scan instead of a couple of XORs.
-- Quiescence only extends captures, not check evasions, so a position where the side to move is
-  in check at the search horizon can still misjudge a forced reply.
+- Quiescence only extends captures and promotions, not check evasions, so a position where the
+  side to move is in check at the search horizon can still misjudge a forced reply.
 - UCI `stop` is a recognized no-op: `go` runs synchronously to completion (bounded by its time
   budget) before the next stdin line is read, so there's never an in-flight search to interrupt.
 - Terminal play and UCI `moves` both use coordinate algebraic notation (`e2e4`, not SAN like
