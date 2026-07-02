@@ -180,6 +180,13 @@ pub fn legal_moves(board: &Board) -> Vec<Move> {
         .collect()
 }
 
+/// Finds the legal move matching `uci` (long algebraic notation, e.g.
+/// `"e2e4"` or `"e7e8q"`), for callers translating user or protocol input
+/// into a `Move` without duplicating a search over `legal_moves`.
+pub fn find_uci_move(board: &Board, uci: &str) -> Option<Move> {
+    legal_moves(board).into_iter().find(|mv| mv.to_uci() == uci)
+}
+
 /// Counts leaf nodes of the legal-move tree to `depth` plies, the standard
 /// correctness benchmark for move generators (perft).
 pub fn perft(board: &Board, depth: u32) -> u64 {
@@ -704,5 +711,19 @@ mod tests {
         assert!(moves
             .iter()
             .any(|m| m.to == Square::new(3, 5) && m.kind == MoveKind::EnPassant));
+    }
+
+    #[test]
+    fn find_uci_move_matches_a_legal_move() {
+        let board = Board::starting_position();
+        let mv = find_uci_move(&board, "e2e4").unwrap();
+        assert_eq!(mv.from, Square::new(4, 1));
+        assert_eq!(mv.to, Square::new(4, 3));
+    }
+
+    #[test]
+    fn find_uci_move_rejects_an_illegal_move() {
+        let board = Board::starting_position();
+        assert!(find_uci_move(&board, "e2e5").is_none());
     }
 }
