@@ -24,8 +24,15 @@ src/
                 strictly dominant over the ones below it.
   killers.rs    KillerMoves: two per-ply killer-quiet-move slots.
   history.rs    HistoryTable: butterfly from/to cutoff-frequency table.
-  search.rs     Search: negamax + alpha-beta, owns a KillerMoves + HistoryTable for the whole
-                tree. Depth-0 leaves extend into quiescence (capture-only search) instead of
+  zobrist.rs    hash: Zobrist hash of a position (pieces, side to move, castling, en passant),
+                recomputed from scratch each call rather than maintained incrementally.
+  tt.rs         TranspositionTable: fixed-size, always-replace table of TTEntry (depth, score,
+                Exact/Lower/Upper bound) keyed by Zobrist hash.
+  search.rs     Search: negamax + alpha-beta, owns a KillerMoves + HistoryTable + Transposition-
+                Table for the whole tree. Each node probes the TT before searching (an exact hit
+                at sufficient depth returns immediately; a bound hit narrows the window) and
+                stores its result after, skipping mate-adjacent scores since those are ply-
+                relative. Depth-0 leaves extend into quiescence (capture-only search) instead of
                 returning the raw eval, to avoid the horizon effect. find_best_move does
                 iterative deepening against a wall-clock budget.
   uci.rs        UCI command loop: uci/isready/ucinewgame/position/go/stop/quit. Tracks the
@@ -72,7 +79,11 @@ cargo fmt
 ## Known simplifications (see BACKLOG.md for the plan to address them)
 
 - The board is a flat `[Option<Piece>; 64]`, not bitboards — simple and correct, not fast.
-- No transposition table yet: `Search` doesn't cache positions across nodes or across `go` calls.
+- The transposition table has no move-ordering hint (no best-move stored per entry) and no
+  replacement scheme beyond always-replace — a deep, valuable entry can be evicted by a shallow
+  one that happens to land in the same bucket.
+- Zobrist hashing is recomputed from scratch per `hash()` call rather than updated incrementally
+  inside `Board::make_move`, so it costs a full board scan instead of a couple of XORs.
 - Quiescence only extends captures, not check evasions, so a position where the side to move is
   in check at the search horizon can still misjudge a forced reply.
 - UCI `stop` is a recognized no-op: `go` runs synchronously to completion (bounded by its time
