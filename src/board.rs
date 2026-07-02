@@ -142,7 +142,11 @@ impl Board {
             let kings = (0..64)
                 .filter(|&i| {
                     let sq = Square::new((i % 8) as u8, (i / 8) as u8);
-                    board.get(sq) == Some(Piece { kind: PieceKind::King, color })
+                    board.get(sq)
+                        == Some(Piece {
+                            kind: PieceKind::King,
+                            color,
+                        })
                 })
                 .count();
             if kings != 1 {
