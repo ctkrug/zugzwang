@@ -2,6 +2,8 @@ use crate::board::Board;
 use crate::movegen::{find_uci_move, is_in_check, legal_moves};
 use crate::moves::Move;
 use crate::search::Search;
+use crate::square::Square;
+use crate::types::PieceKind;
 use std::time::Duration;
 
 /// Time budget for each engine reply in terminal play mode. Short enough
@@ -17,6 +19,10 @@ pub enum GameStatus {
     /// Drawn under the fifty-move rule: 100 consecutive halfmoves (50 full
     /// moves by each side) with no pawn move and no capture.
     FiftyMoveDraw,
+    /// Drawn because neither side has enough material remaining to ever
+    /// force checkmate: king vs king, or king vs king with one lone
+    /// knight or bishop.
+    InsufficientMaterial,
 }
 
 /// Classifies `board` by whether the side to move has a legal move, and if
@@ -35,7 +41,33 @@ pub fn game_status(board: &Board) -> GameStatus {
     if board.halfmove_clock >= 100 {
         return GameStatus::FiftyMoveDraw;
     }
+    if has_insufficient_material(board) {
+        return GameStatus::InsufficientMaterial;
+    }
     GameStatus::Ongoing
+}
+
+/// Whether `board` has too little material left for either side to ever
+/// force checkmate: bare kings, or a king and a single knight or bishop
+/// against a bare king. Deliberately conservative — rarer theoretical
+/// draws (e.g. same-colored bishops on both sides) aren't automatic under
+/// FIDE rules either, and are left for the fifty-move clock to catch.
+fn has_insufficient_material(board: &Board) -> bool {
+    let mut non_king_pieces = Vec::new();
+    for rank in 0..8u8 {
+        for file in 0..8u8 {
+            if let Some(piece) = board.get(Square::new(file, rank)) {
+                if piece.kind != PieceKind::King {
+                    non_king_pieces.push(piece.kind);
+                }
+            }
+        }
+    }
+    match non_king_pieces.as_slice() {
+        [] => true,
+        [kind] => matches!(kind, PieceKind::Knight | PieceKind::Bishop),
+        _ => false,
+    }
 }
 
 /// Applies a human move given in coordinate algebraic notation (e.g.
@@ -99,6 +131,40 @@ mod tests {
         // actually been checkmated: the game already ended on that move.
         let board = Board::from_fen("k7/Q7/1K6/8/8/8/8/8 b - - 100 60").unwrap();
         assert_eq!(game_status(&board), GameStatus::Checkmate);
+    }
+
+    #[test]
+    fn game_status_detects_bare_king_vs_king_as_insufficient_material() {
+        let board = Board::from_fen("4k3/8/8/8/8/8/8/4K3 w - - 0 1").unwrap();
+        assert_eq!(game_status(&board), GameStatus::InsufficientMaterial);
+    }
+
+    #[test]
+    fn game_status_detects_king_and_bishop_vs_king_as_insufficient_material() {
+        let board = Board::from_fen("4k3/8/8/8/8/8/8/3BK3 w - - 0 1").unwrap();
+        assert_eq!(game_status(&board), GameStatus::InsufficientMaterial);
+    }
+
+    #[test]
+    fn game_status_detects_king_and_knight_vs_king_as_insufficient_material() {
+        let board = Board::from_fen("4k3/8/8/8/8/8/8/3NK3 w - - 0 1").unwrap();
+        assert_eq!(game_status(&board), GameStatus::InsufficientMaterial);
+    }
+
+    #[test]
+    fn game_status_king_and_rook_vs_king_is_not_insufficient_material() {
+        // A lone rook can force checkmate, unlike a lone minor piece.
+        let board = Board::from_fen("4k3/8/8/8/8/8/8/3RK3 w - - 0 1").unwrap();
+        assert_eq!(game_status(&board), GameStatus::Ongoing);
+    }
+
+    #[test]
+    fn game_status_two_minor_pieces_is_not_insufficient_material() {
+        // King and two knights vs king isn't a forced win, but it also
+        // isn't automatically drawn under FIDE rules; only a single minor
+        // piece qualifies.
+        let board = Board::from_fen("4k3/8/8/8/8/8/8/2NNK3 w - - 0 1").unwrap();
+        assert_eq!(game_status(&board), GameStatus::Ongoing);
     }
 
     #[test]
