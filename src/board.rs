@@ -25,6 +25,53 @@ impl Board {
         }
     }
 
+    /// Builds a board set up for the standard chess starting position.
+    pub fn starting_position() -> Self {
+        let mut board = Board::empty();
+        let back_rank = [
+            PieceKind::Rook,
+            PieceKind::Knight,
+            PieceKind::Bishop,
+            PieceKind::Queen,
+            PieceKind::King,
+            PieceKind::Bishop,
+            PieceKind::Knight,
+            PieceKind::Rook,
+        ];
+        for file in 0..8u8 {
+            let kind = back_rank[file as usize];
+            board.set(
+                Square::new(file, 0),
+                Some(Piece {
+                    kind,
+                    color: Color::White,
+                }),
+            );
+            board.set(
+                Square::new(file, 1),
+                Some(Piece {
+                    kind: PieceKind::Pawn,
+                    color: Color::White,
+                }),
+            );
+            board.set(
+                Square::new(file, 6),
+                Some(Piece {
+                    kind: PieceKind::Pawn,
+                    color: Color::Black,
+                }),
+            );
+            board.set(
+                Square::new(file, 7),
+                Some(Piece {
+                    kind,
+                    color: Color::Black,
+                }),
+            );
+        }
+        board
+    }
+
     pub fn get(&self, sq: Square) -> Option<Piece> {
         self.squares[sq.index()]
     }
