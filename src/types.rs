@@ -25,6 +25,35 @@ pub enum PieceKind {
     King,
 }
 
+/// Which castling moves each side still has the right to attempt.
+///
+/// A right is lost permanently once the king or the relevant rook moves (or
+/// that rook is captured) — it does not track whether castling is legal
+/// *right now* (e.g. blocked by check), only whether it is still possible.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CastlingRights {
+    pub white_kingside: bool,
+    pub white_queenside: bool,
+    pub black_kingside: bool,
+    pub black_queenside: bool,
+}
+
+impl CastlingRights {
+    pub const NONE: CastlingRights = CastlingRights {
+        white_kingside: false,
+        white_queenside: false,
+        black_kingside: false,
+        black_queenside: false,
+    };
+
+    pub const ALL: CastlingRights = CastlingRights {
+        white_kingside: true,
+        white_queenside: true,
+        black_kingside: true,
+        black_queenside: true,
+    };
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
