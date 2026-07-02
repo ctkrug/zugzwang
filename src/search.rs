@@ -1,5 +1,6 @@
 use crate::board::Board;
 use crate::eval::material_score;
+use crate::history::HistoryTable;
 use crate::killers::KillerMoves;
 use crate::movegen::{is_in_check, legal_moves};
 use crate::ordering::{is_capture, order_moves};
@@ -17,12 +18,14 @@ pub const MATE_SCORE: i32 = 1_000_000;
 /// to the tree currently being explored.
 pub struct Search {
     killers: KillerMoves,
+    history: HistoryTable,
 }
 
 impl Search {
     pub fn new() -> Self {
         Search {
             killers: KillerMoves::new(),
+            history: HistoryTable::new(),
         }
     }
 
@@ -51,7 +54,7 @@ impl Search {
         if depth == 0 {
             return perspective_score(board);
         }
-        order_moves(board, &mut moves, self.killers.get(ply));
+        order_moves(board, &mut moves, self.killers.get(ply), &self.history);
 
         let mut best = i32::MIN + 1;
         for mv in moves {
@@ -66,6 +69,7 @@ impl Search {
             if alpha >= beta {
                 if !is_capture(board, mv) {
                     self.killers.store(ply, mv);
+                    self.history.record(mv, depth);
                 }
                 break;
             }
