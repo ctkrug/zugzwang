@@ -5,13 +5,24 @@ use crate::killers::KillerMoves;
 use crate::movegen::{is_in_check, legal_moves};
 use crate::moves::Move;
 use crate::ordering::{is_capture, order_moves};
+use crate::tt::{Bound, TTEntry, TranspositionTable};
 use crate::types::Color;
+use crate::zobrist;
 use std::time::{Duration, Instant};
 
 /// Score magnitude assigned to a checkmate found at the root (ply 0).
 /// Mates found deeper in the tree score `MATE_SCORE - ply`, so the search
 /// always prefers a shorter forced mate over a longer one.
 pub const MATE_SCORE: i32 = 1_000_000;
+
+/// Default transposition table size for a fresh `Search`.
+const DEFAULT_TT_SIZE_MB: usize = 16;
+
+/// Mate scores are ply-relative (they decay the deeper a mate is found),
+/// so caching one at the ply it was found at and reusing it at a
+/// different ply would misreport the distance to mate. Simplest fix:
+/// don't cache scores anywhere near mate magnitude at all.
+const MATE_CACHE_MARGIN: i32 = 1_000;
 
 /// Holds the state a single search shares across its whole tree.
 ///
@@ -21,6 +32,7 @@ pub const MATE_SCORE: i32 = 1_000_000;
 pub struct Search {
     killers: KillerMoves,
     history: HistoryTable,
+    tt: TranspositionTable,
 }
 
 impl Search {
@@ -28,6 +40,7 @@ impl Search {
         Search {
             killers: KillerMoves::new(),
             history: HistoryTable::new(),
+            tt: TranspositionTable::new(DEFAULT_TT_SIZE_MB),
         }
     }
 
@@ -43,7 +56,7 @@ impl Search {
         depth: u32,
         ply: u32,
         mut alpha: i32,
-        beta: i32,
+        mut beta: i32,
     ) -> i32 {
         let mut moves = legal_moves(board);
         if moves.is_empty() {
@@ -53,11 +66,28 @@ impl Search {
                 0
             };
         }
+
+        let key = zobrist::hash(board);
+        if let Some(entry) = self.tt.get(key) {
+            if entry.depth >= depth {
+                match entry.bound {
+                    Bound::Exact => return entry.score,
+                    Bound::Lower if entry.score > alpha => alpha = entry.score,
+                    Bound::Upper if entry.score < beta => beta = entry.score,
+                    _ => {}
+                }
+                if alpha >= beta {
+                    return entry.score;
+                }
+            }
+        }
+
         if depth == 0 {
             return self.quiescence(board, alpha, beta);
         }
         order_moves(board, &mut moves, self.killers.get(ply), &self.history);
 
+        let original_alpha = alpha;
         let mut best = i32::MIN + 1;
         for mv in moves {
             let next = board.make_move(mv);
@@ -75,6 +105,22 @@ impl Search {
                 }
                 break;
             }
+        }
+
+        if best.abs() <= MATE_SCORE - MATE_CACHE_MARGIN {
+            let bound = if best <= original_alpha {
+                Bound::Upper
+            } else if best >= beta {
+                Bound::Lower
+            } else {
+                Bound::Exact
+            };
+            self.tt.store(TTEntry {
+                key,
+                depth,
+                score: best,
+                bound,
+            });
         }
         best
     }
