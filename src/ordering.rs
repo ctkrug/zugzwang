@@ -8,6 +8,7 @@ use crate::types::PieceKind;
 /// disjoint range far wider than any score that can occur within it, so a
 /// move's tier always dominates its in-tier score when moves are compared.
 const CAPTURE_TIER: i32 = 3_000_000;
+const PROMOTION_TIER: i32 = 2_500_000;
 const KILLER_TIER: i32 = 2_000_000;
 const HISTORY_TIER: i32 = 1_000_000;
 
@@ -18,9 +19,12 @@ const HISTORY_TIER: i32 = 1_000_000;
 ///    attacker): a pawn taking a queen sorts before a queen taking a pawn,
 ///    since the former is far more likely to hold up after the opponent's
 ///    reply.
-/// 2. `killers`, quiet moves that caused a beta cutoff at this ply in a
+/// 2. Non-capturing promotions, ranked by the promoted piece's value — a
+///    queening push is as tactically loud as a capture and worth trying
+///    before quieter moves, even when it doesn't take anything.
+/// 3. `killers`, quiet moves that caused a beta cutoff at this ply in a
 ///    sibling branch.
-/// 3. Remaining quiet moves, ranked by `history` — how often that from/to
+/// 4. Remaining quiet moves, ranked by `history` — how often that from/to
 ///    pair has caused a cutoff anywhere in the tree so far.
 pub fn order_moves(
     board: &Board,
@@ -37,6 +41,9 @@ fn order_score(board: &Board, mv: Move, killers: [Option<Move>; 2], history: &Hi
             .get(mv.from)
             .expect("move has a piece on its from-square");
         return CAPTURE_TIER + piece_value(victim) * 16 - piece_value(attacker.kind);
+    }
+    if let Some(promotion) = mv.promotion {
+        return PROMOTION_TIER + piece_value(promotion);
     }
     if killers[0] == Some(mv) {
         return KILLER_TIER + 1;
@@ -137,5 +144,37 @@ mod tests {
         let mut moves = vec![weak, strong];
         order_moves(&board, &mut moves, [None, None], &history);
         assert_eq!(moves[0], strong);
+    }
+
+    #[test]
+    fn non_capturing_promotion_sorts_before_a_killer_and_other_quiets() {
+        // A pawn on e7 pushing to e8=Q doesn't capture anything, but it's
+        // still far more urgent to search than an ordinary quiet move.
+        let board = Board::from_fen("7k/4P3/8/8/8/8/8/K5N1 w - - 0 1").unwrap();
+        let mut promotion = Move::new(Square::new(4, 6), Square::new(4, 7));
+        promotion.promotion = Some(PieceKind::Queen);
+        let killer = Move::new(Square::new(6, 0), Square::new(5, 2));
+        let mut moves = vec![killer, promotion];
+        order_moves(
+            &board,
+            &mut moves,
+            [Some(killer), None],
+            &HistoryTable::new(),
+        );
+        assert_eq!(moves[0], promotion);
+    }
+
+    #[test]
+    fn a_capture_still_outranks_a_non_capturing_promotion() {
+        // Even a modest capture (a rook taking a pawn) outranks a
+        // non-capturing promotion: captures are unconditionally the
+        // highest tier, promotions the next one down.
+        let board = Board::from_fen("7k/3pP3/8/8/8/8/8/3R3K w - - 0 1").unwrap();
+        let capture = Move::new(Square::new(3, 0), Square::new(3, 6));
+        let mut promotion = Move::new(Square::new(4, 6), Square::new(4, 7));
+        promotion.promotion = Some(PieceKind::Queen);
+        let mut moves = vec![promotion, capture];
+        order_moves(&board, &mut moves, [None, None], &HistoryTable::new());
+        assert_eq!(moves[0], capture);
     }
 }
