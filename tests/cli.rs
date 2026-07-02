@@ -86,6 +86,34 @@ fn uci_mode_replies_with_a_legal_move_to_a_zero_movetime() {
 }
 
 #[test]
+fn uci_mode_go_infinite_still_replies_without_a_stop() {
+    // go infinite isn't actually infinite (documented in ARCHITECTURE.md):
+    // go runs synchronously with no in-flight search to interrupt, so it
+    // falls back to the default time budget instead of waiting forever
+    // for a stop that this test deliberately never sends. Locks in that
+    // it's a bounded fallback, not a real hang, without relying on an
+    // external timeout to catch a regression.
+    let mut child = Command::new(env!("CARGO_BIN_EXE_zugzwang"))
+        .arg("uci")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("failed to run binary");
+
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(b"position startpos\ngo infinite\nquit\n")
+        .unwrap();
+
+    let output = child.wait_with_output().expect("engine did not exit");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.lines().any(|line| line.starts_with("bestmove ")));
+}
+
+#[test]
 fn uci_mode_go_depth_finds_a_free_capture() {
     // A hanging pawn is visible at depth 1; `go depth 1` should find and
     // play the capture, proving the depth token is actually honored

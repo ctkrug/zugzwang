@@ -99,6 +99,8 @@ cargo fmt
   side to move is in check at the search horizon can still misjudge a forced reply.
 - UCI `stop` is a recognized no-op: `go` runs synchronously to completion (bounded by its time
   budget) before the next stdin line is read, so there's never an in-flight search to interrupt.
+  As a consequence, `go infinite` isn't actually infinite — with no `stop` to wait for, it falls
+  back to `DEFAULT_MOVE_TIME` like a `go` with no time control at all.
 - Terminal play and UCI `moves` both use coordinate algebraic notation (`e2e4`, not SAN like
   `Nf3`) — there's no SAN parser.
 - Fifty-move, insufficient-material, and threefold-repetition draw detection
