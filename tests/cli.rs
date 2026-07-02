@@ -86,6 +86,41 @@ fn uci_mode_replies_with_a_legal_move_to_a_zero_movetime() {
 }
 
 #[test]
+fn uci_mode_ucinewgame_resets_the_tracked_board() {
+    let mut child = Command::new(env!("CARGO_BIN_EXE_zugzwang"))
+        .arg("uci")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("failed to run binary");
+
+    // Play several moves in, then send ucinewgame with no follow-up
+    // `position` command at all and ask for a move immediately. If
+    // ucinewgame didn't reset the tracked board, `go` would still be
+    // operating on the old, mid-game position.
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(
+            b"position startpos moves e2e4 e7e5 f1c4 b8c6 d1h5\nucinewgame\ngo movetime 50\nquit\n",
+        )
+        .unwrap();
+
+    let output = child.wait_with_output().expect("engine did not exit");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let bestmove_line = stdout
+        .lines()
+        .find(|line| line.starts_with("bestmove "))
+        .expect("no bestmove line in output");
+    let mv = bestmove_line.strip_prefix("bestmove ").unwrap();
+    // Every legal reply from the starting position starts on rank 1 or 2.
+    let from_rank = mv.as_bytes()[1];
+    assert!(from_rank == b'1' || from_rank == b'2', "got {mv}");
+}
+
+#[test]
 fn uci_mode_ignores_unknown_commands_without_crashing() {
     let mut child = Command::new(env!("CARGO_BIN_EXE_zugzwang"))
         .arg("uci")
