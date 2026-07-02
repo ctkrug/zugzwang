@@ -178,4 +178,29 @@ mod tests {
         let score = Search::new().negamax(&board, 1, 0, -MATE_SCORE, MATE_SCORE);
         assert!(score > 0);
     }
+
+    #[test]
+    fn find_best_move_finds_a_mate_in_one() {
+        // White queen on h7 has several mating slides along the 7th rank
+        // and 8th rank (e.g. a7# or g8#). A mate found at ply 1 dominates
+        // every other move regardless of how deep the iterative search
+        // gets to run within its budget, so the resulting score is
+        // depth-independent even though the exact mating move isn't.
+        let board = Board::from_fen("k7/7Q/1K6/8/8/8/8/8 w - - 0 1").unwrap();
+        let mut search = Search::new();
+        let (mv, score) = search
+            .find_best_move(&board, Duration::from_millis(200))
+            .unwrap();
+        assert_eq!(score, MATE_SCORE - 1);
+        let after = board.make_move(mv);
+        assert!(is_in_check(&after) && legal_moves(&after).is_empty());
+    }
+
+    #[test]
+    fn find_best_move_returns_none_with_no_legal_moves() {
+        let board = Board::from_fen("7k/5Q2/6K1/8/8/8/8/8 b - - 0 1").unwrap();
+        assert!(Search::new()
+            .find_best_move(&board, Duration::from_millis(50))
+            .is_none());
+    }
 }
