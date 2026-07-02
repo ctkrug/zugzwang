@@ -406,6 +406,28 @@ mod tests {
     }
 
     #[test]
+    fn make_move_resets_the_halfmove_clock_on_a_pawn_move() {
+        let mut board = Board::from_fen("4k3/8/8/8/8/8/4P3/4K3 w - - 12 20").unwrap();
+        board.halfmove_clock = 12;
+        let mv = crate::moves::Move::new(Square::new(4, 1), Square::new(4, 2));
+        assert_eq!(board.make_move(mv).halfmove_clock, 0);
+    }
+
+    #[test]
+    fn make_move_resets_the_halfmove_clock_on_a_capture() {
+        let board = Board::from_fen("4k3/8/8/8/8/4n3/4R3/4K3 w - - 12 20").unwrap();
+        let mv = crate::moves::Move::new(Square::new(4, 1), Square::new(4, 2));
+        assert_eq!(board.make_move(mv).halfmove_clock, 0);
+    }
+
+    #[test]
+    fn make_move_increments_the_halfmove_clock_on_a_quiet_non_pawn_move() {
+        let board = Board::from_fen("4k3/8/8/8/8/8/8/4KR2 w - - 12 20").unwrap();
+        let mv = crate::moves::Move::new(Square::new(5, 0), Square::new(5, 3));
+        assert_eq!(board.make_move(mv).halfmove_clock, 13);
+    }
+
+    #[test]
     fn make_move_double_pawn_push_sets_en_passant_target() {
         let board = Board::starting_position();
         let mv = crate::moves::Move::new(Square::new(4, 1), Square::new(4, 3));
