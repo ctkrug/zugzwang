@@ -56,10 +56,11 @@ design, [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the module map, and
 cargo build --release
 cargo test
 
-./target/release/zugzwang          # print the starting position and exit
-./target/release/zugzwang uci      # UCI mode, for a chess GUI to drive over stdin/stdout
-./target/release/zugzwang play     # play a game against the engine in the terminal
-./target/release/zugzwang perft 5  # move generation node counts, depths 1..5
+./target/release/zugzwang            # print the starting position and exit
+./target/release/zugzwang uci        # UCI mode, for a chess GUI to drive over stdin/stdout
+./target/release/zugzwang play       # play a game against the engine in the terminal
+./target/release/zugzwang play <fen> # play from a specific position instead of move one
+./target/release/zugzwang perft 5    # move generation node counts, depths 1..5
 ```
 
 Terminal play and UCI's `position ... moves ...` both take moves in coordinate algebraic

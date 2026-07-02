@@ -47,10 +47,12 @@ src/
                 is_threefold_repetition — a third occurrence of the current position's hash in
                 a caller-supplied history, apply_human_move, engine_reply) — no I/O, so it's
                 unit-tested directly.
-  main.rs       CLI entrypoint: no args prints the board, `uci`, `play` (interactive loop
-                built on play.rs, tracking each position's Zobrist hash across the game for
-                repetition detection), `perft <depth> [fen]`; any other subcommand is a
-                usage error, not silently treated as the no-args default.
+  main.rs       CLI entrypoint: no args prints the board, `uci`, `play [fen]` (interactive loop
+                built on play.rs, starting from the given position or the standard start,
+                tracking each position's Zobrist hash across the game for repetition detection,
+                and checking game-over status before the first prompt so an already-finished
+                starting position is reported immediately), `perft <depth> [fen]`; any other
+                subcommand is a usage error, not silently treated as the no-args default.
 ```
 
 ## Data flow
