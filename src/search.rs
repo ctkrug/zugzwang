@@ -1,6 +1,7 @@
 use crate::board::Board;
 use crate::eval::material_score;
 use crate::movegen::{is_in_check, legal_moves};
+use crate::ordering::order_moves;
 use crate::types::Color;
 
 /// Score magnitude assigned to a checkmate found at the root (ply 0).
@@ -15,7 +16,7 @@ pub const MATE_SCORE: i32 = 1_000_000;
 /// scores decay with depth so shorter forced mates are preferred over
 /// longer ones.
 pub fn negamax(board: &Board, depth: u32, ply: u32, mut alpha: i32, beta: i32) -> i32 {
-    let moves = legal_moves(board);
+    let mut moves = legal_moves(board);
     if moves.is_empty() {
         return if is_in_check(board) {
             -(MATE_SCORE - ply as i32)
@@ -26,6 +27,7 @@ pub fn negamax(board: &Board, depth: u32, ply: u32, mut alpha: i32, beta: i32) -
     if depth == 0 {
         return perspective_score(board);
     }
+    order_moves(board, &mut moves);
 
     let mut best = i32::MIN + 1;
     for mv in moves {
