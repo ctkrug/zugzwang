@@ -472,6 +472,49 @@ mod tests {
     }
 
     #[test]
+    fn make_move_capturing_a_rook_on_its_home_square_clears_that_right() {
+        // A bishop (not a rook) capturing on a8 still costs Black the
+        // queenside right: it's the rook's home square being vacated by
+        // force that matters, not what kind of piece did it.
+        let mut board = Board::empty();
+        board.castling = CastlingRights::ALL;
+        board.set(
+            Square::new(4, 0),
+            Some(Piece {
+                kind: PieceKind::King,
+                color: Color::White,
+            }),
+        );
+        board.set(
+            Square::new(4, 7),
+            Some(Piece {
+                kind: PieceKind::King,
+                color: Color::Black,
+            }),
+        );
+        board.set(
+            Square::new(3, 6),
+            Some(Piece {
+                kind: PieceKind::Bishop,
+                color: Color::White,
+            }),
+        );
+        board.set(
+            Square::new(0, 7),
+            Some(Piece {
+                kind: PieceKind::Rook,
+                color: Color::Black,
+            }),
+        );
+        let mv = crate::moves::Move::new(Square::new(3, 6), Square::new(0, 7));
+        let next = board.make_move(mv);
+        assert!(!next.castling.black_queenside);
+        assert!(next.castling.black_kingside);
+        assert!(next.castling.white_kingside);
+        assert!(next.castling.white_queenside);
+    }
+
+    #[test]
     fn make_move_castle_kingside_relocates_the_rook() {
         let mut board = Board::empty();
         board.castling = CastlingRights::ALL;
