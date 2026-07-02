@@ -486,6 +486,46 @@ mod tests {
     }
 
     #[test]
+    fn from_fen_rejects_an_invalid_piece_character() {
+        assert!(
+            Board::from_fen("xnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1").is_err()
+        );
+    }
+
+    #[test]
+    fn from_fen_rejects_an_invalid_side_to_move() {
+        assert!(Board::from_fen("8/8/8/8/8/8/8/8 x - - 0 1").is_err());
+    }
+
+    #[test]
+    fn from_fen_rejects_an_invalid_en_passant_square() {
+        assert!(Board::from_fen("8/8/8/8/8/8/8/8 w - z9 0 1").is_err());
+    }
+
+    #[test]
+    fn from_fen_rejects_a_non_numeric_halfmove_clock() {
+        assert!(Board::from_fen("8/8/8/8/8/8/8/8 w - - abc 1").is_err());
+    }
+
+    #[test]
+    fn from_fen_rejects_a_non_numeric_fullmove_number() {
+        assert!(Board::from_fen("8/8/8/8/8/8/8/8 w - - 0 abc").is_err());
+    }
+
+    #[test]
+    fn from_fen_fills_in_defaults_for_missing_trailing_fields() {
+        // Only piece placement is strictly required; everything else falls
+        // back to a sane default (as some non-standard FEN sources omit
+        // the move counters).
+        let board = Board::from_fen("8/8/8/8/8/8/8/8").unwrap();
+        assert_eq!(board.side_to_move, Color::White);
+        assert_eq!(board.castling, CastlingRights::NONE);
+        assert_eq!(board.en_passant, None);
+        assert_eq!(board.halfmove_clock, 0);
+        assert_eq!(board.fullmove_number, 1);
+    }
+
+    #[test]
     fn to_fen_round_trips_the_starting_position() {
         let board = Board::starting_position();
         assert_eq!(
