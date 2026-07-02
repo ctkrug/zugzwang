@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zugzwang: a chess engine you can actually read</title>
+<meta name="description" content="A from-scratch chess engine in Rust: alpha-beta search, a Zobrist-hashed transposition table, and a UCI interface, in about 4,000 readable lines you can follow end to end.">
+<meta property="og:title" content="Zugzwang: a chess engine you can actually read">
+<meta property="og:description" content="A from-scratch chess engine in Rust: alpha-beta search, a Zobrist transposition table, and a UCI interface, small enough to read end to end.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #f4efe4;
+    --surface: #ece3d2;
+    --raised: #fbf8f1;
+    --ink: #1c1a17;
+    --muted: #6b6456;
+    --accent: #8c2f39;
+    --accent-deep: #6f242c;
+    --support: #3f6b52;
+    --board-light: #efdfbf;
+    --board-dark: #b58863;
+    --line: #d8cdb8;
+    --shadow: 0 1px 2px rgba(28,26,23,.06), 0 8px 24px rgba(28,26,23,.07);
+    --sans: 'Inter', system-ui, -apple-system, sans-serif;
+    --serif: 'Fraunces', Georgia, serif;
+    --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: var(--sans);
+    background: var(--paper);
+    color: var(--ink);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    background-image: radial-gradient(circle at 1px 1px, rgba(28,26,23,.035) 1px, transparent 0);
+    background-size: 22px 22px;
+  }
+
+  .wrap { width: min(1120px, 92vw); margin: 0 auto; }
+
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 3px; }
+
+  /* ---- Header ---- */
+  header {
+    border-bottom: 1px solid var(--line);
+    background: rgba(244,239,228,.85);
+    backdrop-filter: blur(6px);
+    position: sticky; top: 0; z-index: 10;
+  }
+  .bar { display: flex; align-items: center; justify-content: space-between; padding: 16px 0; }
+  .wordmark { display: flex; align-items: center; gap: 12px; }
+  .mark { width: 34px; height: 34px; border-radius: 6px; display: block; box-shadow: var(--shadow); }
+  .wordmark b {
+    font-family: var(--serif); font-weight: 600; font-size: 24px; letter-spacing: -.01em;
+    color: var(--ink);
+  }
+  .nav-gh {
+    font-weight: 500; font-size: 15px; padding: 9px 16px; border: 1px solid var(--line);
+    border-radius: 6px; color: var(--ink); background: var(--raised); transition: all .16s ease-out;
+    min-height: 44px; display: inline-flex; align-items: center;
+  }
+  .nav-gh:hover { border-color: var(--accent); color: var(--accent); text-decoration: none; }
+
+  /* ---- Hero ---- */
+  .hero { padding: 72px 0 56px; }
+  .hero-grid { display: grid; grid-template-columns: 1.05fr .95fr; gap: 56px; align-items: center; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 13px; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--support); font-weight: 500; margin-bottom: 18px;
+  }
+  h1 {
+    font-family: var(--serif); font-weight: 600; font-size: clamp(38px, 6vw, 54px);
+    line-height: 1.05; letter-spacing: -.02em; margin-bottom: 20px;
+  }
+  h1 .say { color: var(--accent); font-style: italic; }
+  .subhead { font-size: 19px; color: var(--muted); max-width: 34ch; margin-bottom: 32px; }
+  .cta-row { display: flex; flex-wrap: wrap; gap: 14px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px; font-weight: 600; font-size: 16px;
+    padding: 13px 24px; border-radius: 6px; min-height: 48px; transition: all .16s ease-out;
+    border: 1px solid transparent; cursor: pointer;
+  }
+  .btn-primary { background: var(--accent); color: var(--raised); box-shadow: var(--shadow); }
+  .btn-primary:hover { background: var(--accent-deep); text-decoration: none; transform: translateY(-1px); }
+  .btn-primary:active { transform: translateY(1px); }
+  .btn-ghost { background: var(--raised); color: var(--ink); border-color: var(--line); }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); text-decoration: none; }
+
+  /* ---- Board diagram ---- */
+  figure.diagram { background: var(--raised); border: 1px solid var(--line); border-radius: 10px; padding: 22px; box-shadow: var(--shadow); }
+  .board {
+    display: grid; grid-template-columns: 18px repeat(8, 1fr); grid-template-rows: repeat(8, 1fr) 18px;
+    aspect-ratio: 1; width: 100%; font-family: 'Segoe UI Symbol', 'Noto Sans Symbols 2', sans-serif;
+  }
+  .board .rank { display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 11px; color: var(--muted); }
+  .board .file { display: flex; align-items: flex-start; justify-content: center; font-family: var(--mono); font-size: 11px; color: var(--muted); padding-top: 4px; }
+  .board .sq {
+    display: flex; align-items: center; justify-content: center;
+    font-size: clamp(22px, 4vw, 34px); line-height: 1;
+  }
+  .board .sq.light { background: var(--board-light); }
+  .board .sq.dark { background: var(--board-dark); }
+  .board .sq.w { color: #fdfaf3; text-shadow: 0 0 1px #1c1a17, 0 1px 1px rgba(28,26,23,.35); }
+  .board .sq.b { color: #1c1a17; }
+  figcaption { font-family: var(--mono); font-size: 12.5px; color: var(--muted); margin-top: 14px; text-align: center; }
+
+  /* ---- Section scaffolding ---- */
+  section { padding: 56px 0; }
+  .section-head { max-width: 60ch; margin-bottom: 36px; }
+  h2 { font-family: var(--serif); font-weight: 600; font-size: clamp(26px, 4vw, 33px); letter-spacing: -.01em; margin-bottom: 12px; }
+  .section-head p { color: var(--muted); font-size: 17px; }
+
+  /* ---- Transcript ---- */
+  .terminals { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .term { background: #211f1b; border-radius: 10px; box-shadow: var(--shadow); overflow: hidden; border: 1px solid #34302a; }
+  .term-bar { display: flex; align-items: center; gap: 7px; padding: 11px 14px; background: #2b2823; border-bottom: 1px solid #34302a; }
+  .term-bar span { width: 11px; height: 11px; border-radius: 50%; background: #4a453d; }
+  .term-bar em { font-family: var(--mono); font-style: normal; font-size: 12px; color: #b3aa98; margin-left: 8px; }
+  pre { font-family: var(--mono); font-size: 13px; line-height: 1.5; color: #ded5c2; padding: 18px; overflow-x: auto; white-space: pre; }
+  pre .in { color: #e7b6bb; }
+  pre .out { color: #9fc3ad; }
+  pre .dim { color: #8a8272; }
+
+  /* ---- Features ---- */
+  .features { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+  .feature { background: var(--raised); border: 1px solid var(--line); border-radius: 10px; padding: 26px; transition: border-color .16s ease-out, transform .16s ease-out; }
+  .feature:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .feature h3 { font-family: var(--serif); font-size: 20px; font-weight: 600; margin-bottom: 8px; }
+  .feature h3 .k { font-family: var(--mono); font-size: 13px; color: var(--accent); display: block; font-weight: 500; margin-bottom: 4px; letter-spacing: .02em; }
+  .feature p { color: var(--muted); font-size: 15.5px; }
+
+  /* ---- Install ---- */
+  .install-card { background: #211f1b; border-radius: 10px; box-shadow: var(--shadow); overflow: hidden; border: 1px solid #34302a; max-width: 760px; }
+
+  /* ---- Reference / FAQ ---- */
+  .prose { max-width: 68ch; }
+  .prose p { color: var(--ink); margin-bottom: 16px; }
+  .prose h3 { font-family: var(--serif); font-size: 19px; margin: 28px 0 6px; }
+  .prose h2 { margin-bottom: 18px; }
+
+  /* ---- Footer ---- */
+  footer { border-top: 1px solid var(--line); padding: 40px 0; margin-top: 24px; }
+  .foot { display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; align-items: center; color: var(--muted); font-size: 14.5px; }
+  .foot a { color: var(--muted); }
+  .foot a:hover { color: var(--accent); }
+  .cross { font-weight: 500; }
+
+  @media (max-width: 880px) {
+    .hero-grid { grid-template-columns: 1fr; gap: 40px; }
+    figure.diagram { max-width: 440px; }
+    .terminals { grid-template-columns: 1fr; }
+    .features { grid-template-columns: 1fr; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; scroll-behavior: auto; }
+    .btn-primary:hover, .feature:hover { transform: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap bar">
+    <div class="wordmark">
+      <svg class="mark" viewBox="0 0 34 34" role="img" aria-label="Zugzwang mark">
+        <rect width="34" height="34" rx="6" fill="#1c1a17"/>
+        <rect x="4" y="4" width="13" height="13" fill="#8c2f39"/>
+        <rect x="17" y="17" width="13" height="13" fill="#8c2f39"/>
+        <rect x="17" y="4" width="13" height="13" fill="#efdfbf"/>
+        <rect x="4" y="17" width="13" height="13" fill="#efdfbf"/>
+      </svg>
+      <b>Zugzwang</b>
+    </div>
+    <a class="nav-gh" href="https://github.com/ctkrug/zugzwang">View on GitHub</a>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="wrap hero-grid">
+      <div>
+        <p class="eyebrow">From-scratch chess engine · Rust</p>
+        <h1>A chess engine you can <span class="say">actually read</span>.</h1>
+        <p class="subhead">Alpha-beta search, a Zobrist-hashed transposition table, and a full UCI interface, in about 4,000 lines of dependency-free Rust you can follow end to end.</p>
+        <div class="cta-row">
+          <a class="btn btn-primary" href="https://github.com/ctkrug/zugzwang">View on GitHub</a>
+          <a class="btn btn-ghost" href="#run">See it run</a>
+        </div>
+      </div>
+      <figure class="diagram">
+        <div class="board" id="board" aria-label="The starting position as Zugzwang prints it"></div>
+        <figcaption>The starting position, rendered by the engine.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section id="run">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>Watch it think</h2>
+        <p>Zugzwang speaks UCI over stdin/stdout, so any chess GUI can drive it. Or play a full game right in your terminal. Both transcripts below are copied straight from the release binary.</p>
+      </div>
+      <div class="terminals">
+        <div class="term">
+          <div class="term-bar"><span></span><span></span><span></span><em>zugzwang uci</em></div>
+<pre><span class="in">uci</span>
+<span class="out">id name Zugzwang</span>
+<span class="out">id author Charlie Krug</span>
+<span class="out">uciok</span>
+<span class="in">isready</span>
+<span class="out">readyok</span>
+<span class="in">position startpos moves e2e4 e7e5</span>
+<span class="in">go depth 4</span>
+<span class="out">bestmove b1c3</span>
+<span class="in">quit</span></pre>
+        </div>
+        <div class="term">
+          <div class="term-bar"><span></span><span></span><span></span><em>zugzwang play</em></div>
+<pre><span class="dim">Your move (or 'quit'): </span><span class="in">e2e4</span>
+<span class="out">. . . . . . . .
+. . . . P . . .
+. . . . . . . .</span>
+<span class="dim">Engine plays</span> <span class="out">b8c6</span>
+<span class="out">r . b q k b n r
+p p p p p p p p
+. . n . . . . .</span></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div class="section-head">
+        <h2>What's under the hood</h2>
+        <p>Most hobby chess projects stop at legal move generation. Zugzwang goes all the way to something that plays a real game behind a real GUI, and keeps every layer small enough to read.</p>
+      </div>
+      <div class="features">
+        <div class="feature">
+          <h3><span class="k">move generation</span>Legal moves, verified by perft</h3>
+          <p>Full rules including castling, en passant, and promotion, checked against known perft node counts through depth 5 (4,865,609 nodes) and the Kiwipete position, so the move generator is provably correct, not just plausible.</p>
+        </div>
+        <div class="feature">
+          <h3><span class="k">search</span>Alpha-beta with quiescence</h3>
+          <p>Negamax with alpha-beta pruning, iterative deepening against a time budget, and a quiescence search that plays out captures and promotions past the horizon so tactics aren't misjudged mid-exchange.</p>
+        </div>
+        <div class="feature">
+          <h3><span class="k">transposition table</span>Zobrist-hashed caching</h3>
+          <p>Positions are keyed by a Zobrist hash and cached in a fixed-size table, so the search reuses work when the same position is reached by a different move order. Move ordering (MVV-LVA, killers, history) makes the pruning bite.</p>
+        </div>
+        <div class="feature">
+          <h3><span class="k">uci protocol</span>Plugs into any GUI</h3>
+          <p>Implements <code>uci</code>, <code>isready</code>, <code>ucinewgame</code>, <code>position</code>, and <code>go</code> with <code>depth</code>, <code>movetime</code>, and <code>wtime</code>/<code>btime</code>/<code>movestogo</code>, so Arena, CuteChess, or en croissant can play it out of the box.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div class="section-head">
+        <h2>Build it in a minute</h2>
+        <p>Stable Rust, no external chess crates. Clone, build, and you have a working engine.</p>
+      </div>
+      <div class="install-card">
+<pre><span class="dim"># build the optimized binary and run the tests</span>
+<span class="in">cargo build --release</span>
+<span class="in">cargo test</span>
+
+<span class="dim"># print the starting board and exit</span>
+<span class="in">./target/release/zugzwang</span>
+
+<span class="dim"># UCI mode, for a chess GUI to drive over stdin/stdout</span>
+<span class="in">./target/release/zugzwang uci</span>
+
+<span class="dim"># play a game against the engine in the terminal</span>
+<span class="in">./target/release/zugzwang play</span>
+
+<span class="dim"># move-generation node counts, depths 1..5</span>
+<span class="in">./target/release/zugzwang perft 5</span></pre>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap prose">
+      <h2>A readable reference for how a chess engine fits together</h2>
+      <p>Zugzwang is a complete terminal chess engine written from scratch in Rust. It is built for the programmer who has read that alpha-beta pruning, Zobrist hashing, and the UCI protocol exist, but has never seen them wired together in code short enough to follow in one sitting. Production engines like Stockfish are tens of thousands of lines of hand-tuned bitboard code; excellent to compete with, hard to learn from. Zugzwang trades raw strength for clarity: a simple 8x8 board, a straightforward legal move generator, and a search you can trace by hand.</p>
+      <p>Every layer is separable. The board and move generator model the rules and nothing else, validated with perft against the standard reference positions. The search decides which moves are worth exploring and how deep, using negamax with alpha-beta pruning, iterative deepening, a transposition table, and move ordering so the pruning actually cuts. The evaluation scores a position from material plus piece-square tables. On top sits a thin UCI adapter that reads commands from stdin and writes the best move to stdout, which is all any chess GUI needs to use it as an opponent.</p>
+      <p>It is also directly playable. A terminal play mode lets you play a full game without a GUI at all, entering moves in coordinate notation and watching the board redraw after each reply. It detects checkmate, stalemate, the fifty-move rule, insufficient material, and threefold repetition, so a game ends the way a game should.</p>
+
+      <h3>Frequently asked questions</h3>
+
+      <h3>Is Zugzwang strong enough to beat me?</h3>
+      <p>Probably, at casual strength. Playing strength was never the goal for v1: correctness and protocol completeness were. It searches a few ply deep with quiescence and piece-square evaluation, which is enough for a solid club-level game but well short of a tuned engine. Improving strength is the open-ended work that comes after v1.</p>
+
+      <h3>Which chess GUIs work with it?</h3>
+      <p>Any GUI that speaks UCI, which is effectively all of them: Arena, CuteChess, en croissant, and xboard with a UCI adapter. Point the GUI at the <code>zugzwang uci</code> binary and add it as an engine.</p>
+
+      <h3>Why is the board a plain array and not bitboards?</h3>
+      <p>Readability. A flat 64-square array keeps move generation simple to follow and easy to test while the shape of the engine is what matters. A bitboard rewrite is the headline item on the backlog for when performance becomes the point.</p>
+
+      <h3>What notation does it accept?</h3>
+      <p>Coordinate algebraic notation, the same notation UCI uses: <code>e2e4</code> for a move, <code>e7e8q</code> for a promotion. There is no SAN parser (<code>Nf3</code>-style input) yet.</p>
+
+      <h3>Does it have any dependencies?</h3>
+      <p>None beyond the Rust standard library. The board, move generator, search, and UCI layer are all original code, which is the entire point of the project.</p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap foot">
+    <span>Zugzwang · MIT licensed · built by Charlie Krug</span>
+    <span>
+      <a href="https://github.com/ctkrug/zugzwang">Source on GitHub</a>
+      &nbsp;·&nbsp;
+      <a class="cross" href="https://apps.charliekrug.com">More of Charlie's projects → apps.charliekrug.com</a>
+    </span>
+  </div>
+</footer>
+
+<script>
+  // Render the starting position as a printed board diagram (no raster assets).
+  (function () {
+    var board = document.getElementById('board');
+    if (!board) return;
+    var glyph = { p: '♟', n: '♞', b: '♝', r: '♜', q: '♛', k: '♚' };
+    var ranks = ['rnbqkbnr', 'pppppppp', '', '', '', '', 'PPPPPPPP', 'RNBQKBNR'];
+    var files = 'abcdefgh';
+    for (var r = 0; r < 8; r++) {
+      var label = document.createElement('div');
+      label.className = 'rank';
+      label.textContent = 8 - r;
+      board.appendChild(label);
+      for (var f = 0; f < 8; f++) {
+        var cell = document.createElement('div');
+        var isLight = (r + f) % 2 === 0;
+        cell.className = 'sq ' + (isLight ? 'light' : 'dark');
+        var ch = ranks[r][f];
+        if (ch) {
+          var white = ch === ch.toUpperCase();
+          cell.classList.add(white ? 'w' : 'b');
+          cell.textContent = glyph[ch.toLowerCase()];
+        }
+        board.appendChild(cell);
+      }
+    }
+    // bottom-left spacer + file labels a-h
+    board.appendChild(document.createElement('div'));
+    for (var i = 0; i < 8; i++) {
+      var fl = document.createElement('div');
+      fl.className = 'file';
+      fl.textContent = files[i];
+      board.appendChild(fl);
+    }
+  })();
+</script>
+</body>
+</html>
+</content>
