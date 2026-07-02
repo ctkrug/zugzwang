@@ -167,6 +167,19 @@ pub fn pseudo_legal_moves(board: &Board) -> Vec<Move> {
     moves
 }
 
+/// Generates fully legal moves for the side to move: pseudo-legal moves
+/// filtered to exclude any that leave the mover's own king in check.
+pub fn legal_moves(board: &Board) -> Vec<Move> {
+    let color = board.side_to_move;
+    pseudo_legal_moves(board)
+        .into_iter()
+        .filter(|&mv| {
+            let next = board.make_move(mv);
+            !is_square_attacked(&next, find_king(&next, color), color.opposite())
+        })
+        .collect()
+}
+
 /// Generates castling moves for the side to move, applying the standard
 /// rules beyond "the right hasn't been lost": the king isn't currently in
 /// check, the squares it passes through and lands on aren't attacked, and
