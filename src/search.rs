@@ -284,6 +284,17 @@ mod tests {
     }
 
     #[test]
+    fn negamax_populates_the_transposition_table() {
+        let board = Board::from_fen("4k3/8/8/3p4/4P3/8/8/4K3 w - - 0 1").unwrap();
+        let mut search = Search::new();
+        let score = search.negamax(&board, 2, 0, -MATE_SCORE, MATE_SCORE);
+        let key = crate::zobrist::hash(&board);
+        let entry = search.tt.get(key).expect("root position should be cached");
+        assert_eq!(entry.depth, 2);
+        assert_eq!(entry.score, score);
+    }
+
+    #[test]
     fn find_best_move_finds_a_mate_in_one() {
         // White queen on h7 has several mating slides along the 7th rank
         // and 8th rank (e.g. a7# or g8#). A mate found at ply 1 dominates
