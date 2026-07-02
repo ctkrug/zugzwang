@@ -732,6 +732,19 @@ mod tests {
     }
 
     #[test]
+    fn en_passant_capture_is_illegal_if_it_exposes_the_king_on_the_rank() {
+        // White king a5, white pawn d5, black pawn e5 (just double-pushed
+        // from e7), black rook h5. Capturing en passant removes both the
+        // d5 and e5 pawns in the same move, opening the entire 5th rank
+        // between the king and the rook — a discovered check that a naive
+        // "does the destination square matter" filter would miss, since
+        // the captured pawn isn't on the destination square at all.
+        let board = Board::from_fen("4k3/8/8/K2Pp2r/8/8/8/8 w - e6 0 1").unwrap();
+        let moves = legal_moves(&board);
+        assert!(!moves.iter().any(|m| m.kind == MoveKind::EnPassant));
+    }
+
+    #[test]
     fn find_uci_move_matches_a_legal_move() {
         let board = Board::starting_position();
         let mv = find_uci_move(&board, "e2e4").unwrap();
