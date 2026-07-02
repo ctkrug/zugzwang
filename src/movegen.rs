@@ -25,6 +25,19 @@ const KING_OFFSETS: [(i32, i32); 8] = [
     (1, -1),
 ];
 
+const BISHOP_DIRS: [(i32, i32); 4] = [(1, 1), (1, -1), (-1, 1), (-1, -1)];
+const ROOK_DIRS: [(i32, i32); 4] = [(1, 0), (-1, 0), (0, 1), (0, -1)];
+const QUEEN_DIRS: [(i32, i32); 8] = [
+    (1, 1),
+    (1, -1),
+    (-1, 1),
+    (-1, -1),
+    (1, 0),
+    (-1, 0),
+    (0, 1),
+    (0, -1),
+];
+
 fn in_bounds(file: i32, rank: i32) -> bool {
     (0..8).contains(&file) && (0..8).contains(&rank)
 }
@@ -37,7 +50,47 @@ pub fn pseudo_legal_moves(board: &Board) -> Vec<Move> {
     pawn_moves(board, &mut moves);
     step_moves(board, &mut moves, PieceKind::Knight, &KNIGHT_OFFSETS);
     step_moves(board, &mut moves, PieceKind::King, &KING_OFFSETS);
+    sliding_moves(board, &mut moves, PieceKind::Bishop, &BISHOP_DIRS);
+    sliding_moves(board, &mut moves, PieceKind::Rook, &ROOK_DIRS);
+    sliding_moves(board, &mut moves, PieceKind::Queen, &QUEEN_DIRS);
     moves
+}
+
+/// Generates ray moves (bishop/rook/queen) for every piece of `kind`
+/// belonging to the side to move: each direction is walked until it hits
+/// the board edge, a friendly piece (stop, don't include), or an enemy
+/// piece (include as a capture, then stop).
+fn sliding_moves(board: &Board, moves: &mut Vec<Move>, kind: PieceKind, dirs: &[(i32, i32)]) {
+    let color = board.side_to_move;
+    for rank in 0..8u8 {
+        for file in 0..8u8 {
+            let from = Square::new(file, rank);
+            let Some(piece) = board.get(from) else {
+                continue;
+            };
+            if piece.color != color || piece.kind != kind {
+                continue;
+            }
+            for &(df, dr) in dirs {
+                let mut f = file as i32 + df;
+                let mut r = rank as i32 + dr;
+                while in_bounds(f, r) {
+                    let to = Square::new(f as u8, r as u8);
+                    match board.get(to) {
+                        None => moves.push(Move::new(from, to)),
+                        Some(occupant) => {
+                            if occupant.color != color {
+                                moves.push(Move::new(from, to));
+                            }
+                            break;
+                        }
+                    }
+                    f += df;
+                    r += dr;
+                }
+            }
+        }
+    }
 }
 
 /// Generates single-step moves (knight jumps or king steps) for every piece
@@ -198,6 +251,56 @@ mod tests {
             .collect();
         assert_eq!(king_moves.len(), 7);
         assert!(!king_moves.iter().any(|m| m.to == Square::new(4, 5)));
+    }
+
+    #[test]
+    fn rook_on_empty_board_has_fourteen_moves() {
+        let mut board = Board::empty();
+        board.set(
+            Square::new(3, 3),
+            Some(Piece {
+                kind: PieceKind::Rook,
+                color: Color::White,
+            }),
+        );
+        let moves = pseudo_legal_moves(&board);
+        assert_eq!(moves.len(), 14);
+    }
+
+    #[test]
+    fn bishop_ray_stops_at_a_capture_and_a_blocker() {
+        let mut board = Board::empty();
+        board.set(
+            Square::new(3, 3),
+            Some(Piece {
+                kind: PieceKind::Bishop,
+                color: Color::White,
+            }),
+        );
+        board.set(
+            Square::new(5, 5),
+            Some(Piece {
+                kind: PieceKind::Pawn,
+                color: Color::Black,
+            }),
+        );
+        board.set(
+            Square::new(1, 1),
+            Some(Piece {
+                kind: PieceKind::Pawn,
+                color: Color::White,
+            }),
+        );
+        let moves = pseudo_legal_moves(&board);
+        let bishop_moves: Vec<_> = moves
+            .iter()
+            .filter(|m| m.from == Square::new(3, 3))
+            .collect();
+        assert!(bishop_moves.iter().any(|m| m.to == Square::new(4, 4)));
+        assert!(bishop_moves.iter().any(|m| m.to == Square::new(5, 5)));
+        assert!(!bishop_moves.iter().any(|m| m.to == Square::new(6, 6)));
+        assert!(bishop_moves.iter().any(|m| m.to == Square::new(2, 2)));
+        assert!(!bishop_moves.iter().any(|m| m.to == Square::new(1, 1)));
     }
 
     #[test]
