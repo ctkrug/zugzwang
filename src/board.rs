@@ -92,6 +92,93 @@ impl Board {
     pub fn set(&mut self, sq: Square, piece: Option<Piece>) {
         self.squares[sq.index()] = piece;
     }
+
+    /// Applies a move and returns the resulting position.
+    ///
+    /// Assumes `mv` is at least pseudo-legal for the side to move; callers
+    /// filtering for full legality (no self-check) do so by calling this
+    /// and then checking whether the moving side's king is attacked.
+    pub fn make_move(&self, mv: crate::moves::Move) -> Board {
+        use crate::moves::MoveKind;
+
+        let mut board = *self;
+        let color = board.side_to_move;
+        let piece = board
+            .get(mv.from)
+            .expect("make_move called with no piece on the from-square");
+        let is_pawn_move = piece.kind == PieceKind::Pawn;
+        let is_capture = board.get(mv.to).is_some() || mv.kind == MoveKind::EnPassant;
+
+        match mv.kind {
+            MoveKind::EnPassant => {
+                let captured = Square::new(mv.to.file, mv.from.rank);
+                board.set(captured, None);
+            }
+            MoveKind::CastleKingside => {
+                let rank = mv.from.rank;
+                board.set(Square::new(5, rank), board.get(Square::new(7, rank)));
+                board.set(Square::new(7, rank), None);
+            }
+            MoveKind::CastleQueenside => {
+                let rank = mv.from.rank;
+                board.set(Square::new(3, rank), board.get(Square::new(0, rank)));
+                board.set(Square::new(0, rank), None);
+            }
+            MoveKind::Normal => {}
+        }
+
+        board.set(mv.from, None);
+        let placed = match mv.promotion {
+            Some(kind) => Piece { kind, color },
+            None => piece,
+        };
+        board.set(mv.to, Some(placed));
+
+        board.update_castling_rights(mv, piece);
+
+        board.en_passant = if is_pawn_move && mv.from.rank.abs_diff(mv.to.rank) == 2 {
+            Some(Square::new(mv.from.file, (mv.from.rank + mv.to.rank) / 2))
+        } else {
+            None
+        };
+
+        board.halfmove_clock = if is_pawn_move || is_capture {
+            0
+        } else {
+            board.halfmove_clock + 1
+        };
+        if color == Color::Black {
+            board.fullmove_number += 1;
+        }
+        board.side_to_move = color.opposite();
+        board
+    }
+
+    /// Clears castling rights lost by this move: the king or a rook moving
+    /// off its home square, or a rook being captured on its home square.
+    fn update_castling_rights(&mut self, mv: crate::moves::Move, moved_piece: Piece) {
+        if moved_piece.kind == PieceKind::King {
+            match moved_piece.color {
+                Color::White => {
+                    self.castling.white_kingside = false;
+                    self.castling.white_queenside = false;
+                }
+                Color::Black => {
+                    self.castling.black_kingside = false;
+                    self.castling.black_queenside = false;
+                }
+            }
+        }
+        for sq in [mv.from, mv.to] {
+            match (sq.file, sq.rank) {
+                (0, 0) => self.castling.white_queenside = false,
+                (7, 0) => self.castling.white_kingside = false,
+                (0, 7) => self.castling.black_queenside = false,
+                (7, 7) => self.castling.black_kingside = false,
+                _ => {}
+            }
+        }
+    }
 }
 
 impl fmt::Display for Board {
@@ -152,5 +239,95 @@ mod tests {
         let black_king = board.get(Square::new(4, 7)).unwrap();
         assert_eq!(white_king.kind, PieceKind::King);
         assert_eq!(black_king.kind, PieceKind::King);
+    }
+
+    #[test]
+    fn make_move_relocates_the_piece_and_flips_side_to_move() {
+        let board = Board::starting_position();
+        let mv = crate::moves::Move::new(Square::new(4, 1), Square::new(4, 3));
+        let next = board.make_move(mv);
+
+        assert!(next.get(Square::new(4, 1)).is_none());
+        assert_eq!(next.get(Square::new(4, 3)).unwrap().kind, PieceKind::Pawn);
+        assert_eq!(next.side_to_move, Color::Black);
+    }
+
+    #[test]
+    fn make_move_double_pawn_push_sets_en_passant_target() {
+        let board = Board::starting_position();
+        let mv = crate::moves::Move::new(Square::new(4, 1), Square::new(4, 3));
+        let next = board.make_move(mv);
+        assert_eq!(next.en_passant, Some(Square::new(4, 2)));
+    }
+
+    #[test]
+    fn make_move_king_move_clears_both_castling_rights() {
+        let mut board = Board::empty();
+        board.castling = CastlingRights::ALL;
+        board.set(
+            Square::new(4, 0),
+            Some(Piece {
+                kind: PieceKind::King,
+                color: Color::White,
+            }),
+        );
+        let mv = crate::moves::Move::new(Square::new(4, 0), Square::new(4, 1));
+        let next = board.make_move(mv);
+        assert!(!next.castling.white_kingside);
+        assert!(!next.castling.white_queenside);
+        assert!(next.castling.black_kingside);
+    }
+
+    #[test]
+    fn make_move_castle_kingside_relocates_the_rook() {
+        let mut board = Board::empty();
+        board.castling = CastlingRights::ALL;
+        board.set(
+            Square::new(4, 0),
+            Some(Piece {
+                kind: PieceKind::King,
+                color: Color::White,
+            }),
+        );
+        board.set(
+            Square::new(7, 0),
+            Some(Piece {
+                kind: PieceKind::Rook,
+                color: Color::White,
+            }),
+        );
+        let mut mv = crate::moves::Move::new(Square::new(4, 0), Square::new(6, 0));
+        mv.kind = crate::moves::MoveKind::CastleKingside;
+        let next = board.make_move(mv);
+
+        assert_eq!(next.get(Square::new(6, 0)).unwrap().kind, PieceKind::King);
+        assert_eq!(next.get(Square::new(5, 0)).unwrap().kind, PieceKind::Rook);
+        assert!(next.get(Square::new(7, 0)).is_none());
+    }
+
+    #[test]
+    fn make_move_en_passant_removes_the_captured_pawn() {
+        let mut board = Board::empty();
+        board.set(
+            Square::new(4, 4),
+            Some(Piece {
+                kind: PieceKind::Pawn,
+                color: Color::White,
+            }),
+        );
+        board.set(
+            Square::new(3, 4),
+            Some(Piece {
+                kind: PieceKind::Pawn,
+                color: Color::Black,
+            }),
+        );
+        board.en_passant = Some(Square::new(3, 5));
+        let mut mv = crate::moves::Move::new(Square::new(4, 4), Square::new(3, 5));
+        mv.kind = crate::moves::MoveKind::EnPassant;
+        let next = board.make_move(mv);
+
+        assert!(next.get(Square::new(3, 4)).is_none());
+        assert_eq!(next.get(Square::new(3, 5)).unwrap().kind, PieceKind::Pawn);
     }
 }
