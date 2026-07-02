@@ -171,6 +171,31 @@ fn uci_mode_keeps_the_prior_position_after_a_malformed_position_command() {
 }
 
 #[test]
+fn uci_mode_position_fen_with_no_king_does_not_crash_a_later_go() {
+    // A `position fen` with a kingless (but otherwise well-formed) FEN
+    // must be rejected like any other malformed position, not accepted
+    // and left to panic move generation on the next `go`.
+    let mut child = Command::new(env!("CARGO_BIN_EXE_zugzwang"))
+        .arg("uci")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("failed to run binary");
+
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(b"position fen 8/8/8/8/8/8/P7/8 w - - 0 1\ngo movetime 50\nquit\n")
+        .unwrap();
+
+    let output = child.wait_with_output().expect("engine did not exit");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.lines().any(|line| line.starts_with("bestmove ")));
+}
+
+#[test]
 fn perft_command_prints_known_node_counts_for_the_starting_position() {
     let output = Command::new(env!("CARGO_BIN_EXE_zugzwang"))
         .args(["perft", "3"])
@@ -216,6 +241,22 @@ fn perft_command_rejects_a_malformed_fen() {
         .expect("failed to run binary");
 
     assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("invalid FEN"));
+}
+
+#[test]
+fn perft_command_rejects_a_fen_with_no_king() {
+    // A structurally valid FEN (8 ranks, 8 squares each, legal piece
+    // letters) that's missing a king used to panic deep in move
+    // generation instead of being rejected as invalid input.
+    let output = Command::new(env!("CARGO_BIN_EXE_zugzwang"))
+        .args(["perft", "1", "8/8/8/8/8/8/P7/8", "w", "-", "-", "0", "1"])
+        .output()
+        .expect("failed to run binary");
+
+    assert!(!output.status.success());
+    assert!(output.status.code() != Some(101), "process panicked");
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("invalid FEN"));
 }
