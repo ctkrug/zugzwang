@@ -319,6 +319,21 @@ mod tests {
     }
 
     #[test]
+    fn find_best_move_avoids_a_queen_for_pawn_losing_trade() {
+        // White queen can capture a pawn on d7, but a black king on d8
+        // defends it: Qxd7 Kxd7 loses a queen for a pawn. Move ordering
+        // tries captures first, so a search that only looked one ply deep
+        // would walk straight into this; the engine must look past the
+        // immediate capture to the recapture and prefer something else.
+        let board = Board::from_fen("3k4/3p4/8/8/8/8/8/3QK3 w - - 0 1").unwrap();
+        let (mv, score) = Search::new()
+            .find_best_move(&board, Duration::from_millis(200))
+            .unwrap();
+        assert_ne!(mv.to_uci(), "d1d7");
+        assert!(score > -400, "expected no material-down score, got {score}");
+    }
+
+    #[test]
     fn find_best_move_returns_none_with_no_legal_moves() {
         let board = Board::from_fen("7k/5Q2/6K1/8/8/8/8/8 b - - 0 1").unwrap();
         assert!(Search::new()
