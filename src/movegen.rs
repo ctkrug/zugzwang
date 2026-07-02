@@ -163,7 +163,69 @@ pub fn pseudo_legal_moves(board: &Board) -> Vec<Move> {
     sliding_moves(board, &mut moves, PieceKind::Bishop, &BISHOP_DIRS);
     sliding_moves(board, &mut moves, PieceKind::Rook, &ROOK_DIRS);
     sliding_moves(board, &mut moves, PieceKind::Queen, &QUEEN_DIRS);
+    castling_moves(board, &mut moves);
     moves
+}
+
+/// Generates castling moves for the side to move, applying the standard
+/// rules beyond "the right hasn't been lost": the king isn't currently in
+/// check, the squares it passes through and lands on aren't attacked, and
+/// the squares between king and rook are empty.
+fn castling_moves(board: &Board, moves: &mut Vec<Move>) {
+    let color = board.side_to_move;
+    let rank = match color {
+        Color::White => 0,
+        Color::Black => 7,
+    };
+    let (kingside_right, queenside_right) = match color {
+        Color::White => (
+            board.castling.white_kingside,
+            board.castling.white_queenside,
+        ),
+        Color::Black => (
+            board.castling.black_kingside,
+            board.castling.black_queenside,
+        ),
+    };
+    if !kingside_right && !queenside_right {
+        return;
+    }
+
+    let enemy = color.opposite();
+    let king_sq = Square::new(4, rank);
+    if is_square_attacked(board, king_sq, enemy) {
+        return;
+    }
+
+    if kingside_right {
+        let f_sq = Square::new(5, rank);
+        let g_sq = Square::new(6, rank);
+        if board.get(f_sq).is_none()
+            && board.get(g_sq).is_none()
+            && !is_square_attacked(board, f_sq, enemy)
+            && !is_square_attacked(board, g_sq, enemy)
+        {
+            let mut mv = Move::new(king_sq, g_sq);
+            mv.kind = MoveKind::CastleKingside;
+            moves.push(mv);
+        }
+    }
+
+    if queenside_right {
+        let d_sq = Square::new(3, rank);
+        let c_sq = Square::new(2, rank);
+        let b_sq = Square::new(1, rank);
+        if board.get(d_sq).is_none()
+            && board.get(c_sq).is_none()
+            && board.get(b_sq).is_none()
+            && !is_square_attacked(board, d_sq, enemy)
+            && !is_square_attacked(board, c_sq, enemy)
+        {
+            let mut mv = Move::new(king_sq, c_sq);
+            mv.kind = MoveKind::CastleQueenside;
+            moves.push(mv);
+        }
+    }
 }
 
 /// Generates ray moves (bishop/rook/queen) for every piece of `kind`
@@ -466,6 +528,43 @@ mod tests {
             }),
         );
         assert!(is_in_check(&board));
+    }
+
+    #[test]
+    fn castling_available_when_squares_clear_and_safe() {
+        let board = Board::from_fen("r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1").unwrap();
+        let moves = pseudo_legal_moves(&board);
+        assert!(moves
+            .iter()
+            .any(|m| m.kind == MoveKind::CastleKingside && m.to == Square::new(6, 0)));
+        assert!(moves
+            .iter()
+            .any(|m| m.kind == MoveKind::CastleQueenside && m.to == Square::new(2, 0)));
+    }
+
+    #[test]
+    fn castling_blocked_when_king_in_check() {
+        let board = Board::from_fen("r3k2r/8/8/8/8/8/4R3/4K3 b kq - 0 1").unwrap();
+        let moves = pseudo_legal_moves(&board);
+        assert!(!moves
+            .iter()
+            .any(|m| matches!(m.kind, MoveKind::CastleKingside | MoveKind::CastleQueenside)));
+    }
+
+    #[test]
+    fn castling_blocked_when_passing_through_attacked_square() {
+        // White rook on f2 attacks f1, the square the king must pass
+        // through to castle kingside.
+        let board = Board::from_fen("4k3/8/8/8/8/8/5r2/4K2R w K - 0 1").unwrap();
+        let moves = pseudo_legal_moves(&board);
+        assert!(!moves.iter().any(|m| m.kind == MoveKind::CastleKingside));
+    }
+
+    #[test]
+    fn castling_blocked_when_squares_between_are_occupied() {
+        let board = Board::from_fen("4k3/8/8/8/8/8/8/4KB1R w K - 0 1").unwrap();
+        let moves = pseudo_legal_moves(&board);
+        assert!(!moves.iter().any(|m| m.kind == MoveKind::CastleKingside));
     }
 
     #[test]
