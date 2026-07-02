@@ -43,9 +43,10 @@ src/
                 third occurrence of the current position's hash in a caller-supplied
                 history, apply_human_move, engine_reply) — no I/O, so it's unit-tested
                 directly.
-  main.rs       CLI entrypoint: default (prints the board), `uci`, `play` (interactive loop
+  main.rs       CLI entrypoint: no args prints the board, `uci`, `play` (interactive loop
                 built on play.rs, tracking each position's Zobrist hash across the game for
-                repetition detection), `perft <depth> [fen]`.
+                repetition detection), `perft <depth> [fen]`; any other subcommand is a
+                usage error, not silently treated as the no-args default.
 ```
 
 ## Data flow
