@@ -169,18 +169,25 @@ impl Search {
     /// The time check happens between root moves, not inside deeper plies,
     /// so a depth already in progress when the budget expires is allowed to
     /// finish rather than being cut off mid-move.
+    ///
+    /// Depth 1 always runs to completion regardless of `budget`: it's cheap
+    /// (one shallow search per legal move), and this guarantees a legal
+    /// move is always returned — even under a near-zero or zero budget —
+    /// instead of `None`, which a UCI GUI reads as `bestmove 0000` and
+    /// treats as a forfeit.
     pub fn find_best_move(&mut self, board: &Board, budget: Duration) -> Option<(Move, i32)> {
         let deadline = Instant::now() + budget;
-        let mut best = None;
-        let mut depth = 1;
+        let no_deadline = Instant::now() + Duration::from_secs(3600);
+        let mut best = self.root_search(board, 1, no_deadline)?;
+        let mut depth = 2;
         while Instant::now() < deadline {
             match self.root_search(board, depth, deadline) {
-                Some(result) => best = Some(result),
+                Some(result) => best = result,
                 None => break,
             }
             depth += 1;
         }
-        best
+        Some(best)
     }
 
     /// Searches every root move to `depth` and returns the best one found,
@@ -317,5 +324,18 @@ mod tests {
         assert!(Search::new()
             .find_best_move(&board, Duration::from_millis(50))
             .is_none());
+    }
+
+    #[test]
+    fn find_best_move_still_returns_a_legal_move_with_a_zero_time_budget() {
+        // A UCI GUI can send `go movetime 0` (or a wtime/btime so low the
+        // clamped budget rounds down); the engine must still answer with a
+        // legal move rather than `None`, which uci::run renders as
+        // `bestmove 0000` — read by most GUIs as a forfeit.
+        let board = Board::starting_position();
+        let (mv, _) = Search::new()
+            .find_best_move(&board, Duration::ZERO)
+            .expect("a zero budget must still return a legal move");
+        assert!(legal_moves(&board).contains(&mv));
     }
 }
