@@ -76,6 +76,10 @@ fn report_game_over(board: &Board) -> bool {
             println!("Stalemate.");
             true
         }
+        GameStatus::FiftyMoveDraw => {
+            println!("Draw by the fifty-move rule.");
+            true
+        }
         GameStatus::Ongoing => false,
     }
 }

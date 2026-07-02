@@ -14,20 +14,28 @@ pub enum GameStatus {
     Ongoing,
     Checkmate,
     Stalemate,
+    /// Drawn under the fifty-move rule: 100 consecutive halfmoves (50 full
+    /// moves by each side) with no pawn move and no capture.
+    FiftyMoveDraw,
 }
 
 /// Classifies `board` by whether the side to move has a legal move, and if
 /// not, whether that's because they're in check (checkmate) or not
-/// (stalemate).
+/// (stalemate). A side with a legal move can still be in a position that's
+/// drawn under the fifty-move rule, checked against `halfmove_clock`
+/// (already tracked on `Board` for FEN round-tripping).
 pub fn game_status(board: &Board) -> GameStatus {
-    if !legal_moves(board).is_empty() {
-        return GameStatus::Ongoing;
+    if legal_moves(board).is_empty() {
+        return if is_in_check(board) {
+            GameStatus::Checkmate
+        } else {
+            GameStatus::Stalemate
+        };
     }
-    if is_in_check(board) {
-        GameStatus::Checkmate
-    } else {
-        GameStatus::Stalemate
+    if board.halfmove_clock >= 100 {
+        return GameStatus::FiftyMoveDraw;
     }
+    GameStatus::Ongoing
 }
 
 /// Applies a human move given in coordinate algebraic notation (e.g.
@@ -64,6 +72,20 @@ mod tests {
     #[test]
     fn game_status_detects_checkmate() {
         let board = Board::from_fen("k7/Q7/1K6/8/8/8/8/8 b - - 0 1").unwrap();
+        assert_eq!(game_status(&board), GameStatus::Checkmate);
+    }
+
+    #[test]
+    fn game_status_detects_a_fifty_move_draw() {
+        let board = Board::from_fen("4k3/8/8/8/8/8/8/4K3 w - - 100 60").unwrap();
+        assert_eq!(game_status(&board), GameStatus::FiftyMoveDraw);
+    }
+
+    #[test]
+    fn game_status_checkmate_takes_priority_over_the_fifty_move_clock() {
+        // A halfmove clock past 100 doesn't matter if the side to move has
+        // actually been checkmated: the game already ended on that move.
+        let board = Board::from_fen("k7/Q7/1K6/8/8/8/8/8 b - - 100 60").unwrap();
         assert_eq!(game_status(&board), GameStatus::Checkmate);
     }
 
