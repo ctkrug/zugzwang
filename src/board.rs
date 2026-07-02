@@ -113,3 +113,32 @@ fn piece_symbol(piece: Piece) -> char {
         c
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn starting_position_has_sixteen_pieces_per_side() {
+        let board = Board::starting_position();
+        let count = |color: Color| {
+            (0..64)
+                .filter(|&i| {
+                    let sq = Square::new((i % 8) as u8, (i / 8) as u8);
+                    board.get(sq).map(|p| p.color) == Some(color)
+                })
+                .count()
+        };
+        assert_eq!(count(Color::White), 16);
+        assert_eq!(count(Color::Black), 16);
+    }
+
+    #[test]
+    fn starting_position_places_kings_on_e_file() {
+        let board = Board::starting_position();
+        let white_king = board.get(Square::new(4, 0)).unwrap();
+        let black_king = board.get(Square::new(4, 7)).unwrap();
+        assert_eq!(white_king.kind, PieceKind::King);
+        assert_eq!(black_king.kind, PieceKind::King);
+    }
+}
