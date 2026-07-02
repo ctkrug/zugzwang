@@ -19,11 +19,13 @@ game start to finish. That's the difference between a toy and an engine.
 - **Move generation** — fully legal move generation for all pieces, including castling, en
   passant, and promotion, validated against perft test positions through depth 5 (starting
   position and the "Kiwipete" position).
-- **Search** — negamax with alpha-beta pruning and iterative deepening against a configurable
-  time budget.
+- **Search** — negamax with alpha-beta pruning, iterative deepening against a configurable time
+  budget, quiescence search to avoid the horizon effect, and a transposition table keyed by
+  Zobrist hashing.
 - **Move ordering** — MVV-LVA capture ordering, killer moves, and a history heuristic, so
   alpha-beta pruning cuts off effectively.
-- **Evaluation** — material only so far; piece-square tables and quiescence search are next.
+- **Evaluation** — material plus piece-square tables, rewarding pieces for standing on
+  typically-good squares, not just for existing.
 - **UCI protocol** — `uci` mode speaks the Universal Chess Interface (`uci`, `isready`,
   `ucinewgame`, `position`, `go` with `movetime`/`wtime`/`btime`/`movestogo`, `stop`, `quit`)
   over stdin/stdout, so any UCI-compatible GUI can drive it.
@@ -32,8 +34,8 @@ game start to finish. That's the difference between a toy and an engine.
 - **Perft debug command** — `perft <depth> [fen]` prints node counts per depth for validating
   move generation against known-good positions.
 
-See [`docs/BACKLOG.md`](docs/BACKLOG.md) for what's not built yet (bitboards, a transposition
-table, quiescence search, piece-square tables).
+See [`docs/BACKLOG.md`](docs/BACKLOG.md) for what's not built yet (mainly a bitboard board
+representation for performance, and playing a full game against a real UCI GUI end to end).
 
 ## Stack
 
