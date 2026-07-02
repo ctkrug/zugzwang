@@ -1,5 +1,6 @@
 use crate::square::Square;
 use crate::types::{Color, PieceKind};
+use std::fmt;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Piece {
@@ -78,5 +79,37 @@ impl Board {
 
     pub fn set(&mut self, sq: Square, piece: Option<Piece>) {
         self.squares[sq.index()] = piece;
+    }
+}
+
+impl fmt::Display for Board {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for rank in (0..8u8).rev() {
+            for file in 0..8u8 {
+                let symbol = match self.get(Square::new(file, rank)) {
+                    Some(piece) => piece_symbol(piece),
+                    None => '.',
+                };
+                write!(f, "{symbol} ")?;
+            }
+            writeln!(f)?;
+        }
+        Ok(())
+    }
+}
+
+fn piece_symbol(piece: Piece) -> char {
+    let c = match piece.kind {
+        PieceKind::Pawn => 'p',
+        PieceKind::Knight => 'n',
+        PieceKind::Bishop => 'b',
+        PieceKind::Rook => 'r',
+        PieceKind::Queen => 'q',
+        PieceKind::King => 'k',
+    };
+    if piece.color == Color::White {
+        c.to_ascii_uppercase()
+    } else {
+        c
     }
 }
