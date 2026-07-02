@@ -232,11 +232,14 @@ fn castling_moves(board: &Board, moves: &mut Vec<Move>) {
     if is_square_attacked(board, king_sq, enemy) {
         return;
     }
+    let has_rook_on = |sq: Square| matches!(board.get(sq), Some(p) if p.color == color && p.kind == PieceKind::Rook);
 
     if kingside_right {
         let f_sq = Square::new(5, rank);
         let g_sq = Square::new(6, rank);
-        if board.get(f_sq).is_none()
+        let h_sq = Square::new(7, rank);
+        if has_rook_on(h_sq)
+            && board.get(f_sq).is_none()
             && board.get(g_sq).is_none()
             && !is_square_attacked(board, f_sq, enemy)
             && !is_square_attacked(board, g_sq, enemy)
@@ -251,7 +254,9 @@ fn castling_moves(board: &Board, moves: &mut Vec<Move>) {
         let d_sq = Square::new(3, rank);
         let c_sq = Square::new(2, rank);
         let b_sq = Square::new(1, rank);
-        if board.get(d_sq).is_none()
+        let a_sq = Square::new(0, rank);
+        if has_rook_on(a_sq)
+            && board.get(d_sq).is_none()
             && board.get(c_sq).is_none()
             && board.get(b_sq).is_none()
             && !is_square_attacked(board, d_sq, enemy)
@@ -655,6 +660,19 @@ mod tests {
         let board = Board::from_fen("4k3/8/8/8/8/8/8/4KB1R w K - 0 1").unwrap();
         let moves = pseudo_legal_moves(&board);
         assert!(!moves.iter().any(|m| m.kind == MoveKind::CastleKingside));
+    }
+
+    #[test]
+    fn castling_blocked_when_the_rook_is_absent_despite_claimed_rights() {
+        // A malformed but structurally valid FEN can claim a castling right
+        // with no rook on the corner square (e.g. from an untrusted UCI
+        // `position fen` command); generating the move anyway would let the
+        // king "castle" into a rookless square.
+        let board = Board::from_fen("4k3/8/8/8/8/8/8/4K3 w KQ - 0 1").unwrap();
+        let moves = pseudo_legal_moves(&board);
+        assert!(!moves
+            .iter()
+            .any(|m| matches!(m.kind, MoveKind::CastleKingside | MoveKind::CastleQueenside)));
     }
 
     #[test]
