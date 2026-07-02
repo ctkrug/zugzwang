@@ -171,6 +171,36 @@ fn uci_mode_ucinewgame_resets_the_tracked_board() {
 }
 
 #[test]
+fn uci_mode_exits_cleanly_on_stdin_eof_without_a_quit_command() {
+    // Some GUIs tear down an engine by closing its stdin pipe instead of
+    // sending "quit" — the command loop reads lines from an iterator
+    // that simply ends on EOF, so this must exit cleanly rather than
+    // hang waiting for more input.
+    let mut child = Command::new(env!("CARGO_BIN_EXE_zugzwang"))
+        .arg("uci")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("failed to run binary");
+
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(b"uci\nposition startpos\ngo movetime 50\n")
+        .unwrap();
+    // Dropping the write handle above already closed our end of the pipe;
+    // wait_with_output blocks until the child exits, so a hang here would
+    // fail the test on the harness's own timeout rather than looping
+    // forever.
+
+    let output = child.wait_with_output().expect("engine did not exit");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.lines().any(|line| line.starts_with("bestmove ")));
+}
+
+#[test]
 fn uci_mode_ignores_unknown_commands_without_crashing() {
     let mut child = Command::new(env!("CARGO_BIN_EXE_zugzwang"))
         .arg("uci")
