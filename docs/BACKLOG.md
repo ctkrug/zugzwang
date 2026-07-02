@@ -8,8 +8,8 @@ concrete commits when it's actually built.
 The foundation everything else depends on: a correct board and fully legal move generation.
 
 - [ ] Replace the array-based board with a bitboard representation for performance.
-- [ ] Implement FEN parsing and serialization (`Board::from_fen` / `Board::to_fen`).
-- [ ] Implement pseudo-legal move generation for all six piece types, including castling,
+- [x] Implement FEN parsing and serialization (`Board::from_fen` / `Board::to_fen`).
+- [x] Implement pseudo-legal move generation for all six piece types, including castling,
       en passant, and promotion.
 - [x] Implement check detection and legal-move filtering (pins, moving into check, castling
       through/out of check).
@@ -20,7 +20,7 @@ The foundation everything else depends on: a correct board and fully legal move 
 
 Turns legal moves into a decision: what's the best move in this position, right now.
 
-- [ ] Implement alpha-beta pruning on top of the existing negamax skeleton.
+- [x] Implement alpha-beta pruning on top of the existing negamax skeleton.
 - [ ] Add iterative deepening with a configurable time budget.
 - [ ] Implement Zobrist hashing and a transposition table keyed by position hash.
 - [ ] Add move ordering (MVV-LVA for captures, killer moves, history heuristic) so alpha-beta
