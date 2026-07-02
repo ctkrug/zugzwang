@@ -42,6 +42,116 @@ fn in_bounds(file: i32, rank: i32) -> bool {
     (0..8).contains(&file) && (0..8).contains(&rank)
 }
 
+/// Returns whether `sq` is attacked by any piece of color `by`, checked
+/// piece-type by piece-type from the target square outward. Used both for
+/// "is my king in check" and for the squares a king must not castle
+/// through or into.
+pub fn is_square_attacked(board: &Board, sq: Square, by: Color) -> bool {
+    let pawn_rank_offset: i32 = match by {
+        Color::White => -1,
+        Color::Black => 1,
+    };
+    for df in [-1i32, 1] {
+        let f = sq.file as i32 + df;
+        let r = sq.rank as i32 + pawn_rank_offset;
+        if in_bounds(f, r) {
+            if let Some(p) = board.get(Square::new(f as u8, r as u8)) {
+                if p.color == by && p.kind == PieceKind::Pawn {
+                    return true;
+                }
+            }
+        }
+    }
+
+    for &(df, dr) in &KNIGHT_OFFSETS {
+        let f = sq.file as i32 + df;
+        let r = sq.rank as i32 + dr;
+        if in_bounds(f, r) {
+            if let Some(p) = board.get(Square::new(f as u8, r as u8)) {
+                if p.color == by && p.kind == PieceKind::Knight {
+                    return true;
+                }
+            }
+        }
+    }
+
+    for &(df, dr) in &KING_OFFSETS {
+        let f = sq.file as i32 + df;
+        let r = sq.rank as i32 + dr;
+        if in_bounds(f, r) {
+            if let Some(p) = board.get(Square::new(f as u8, r as u8)) {
+                if p.color == by && p.kind == PieceKind::King {
+                    return true;
+                }
+            }
+        }
+    }
+
+    if ray_attacked_by(
+        board,
+        sq,
+        by,
+        &BISHOP_DIRS,
+        &[PieceKind::Bishop, PieceKind::Queen],
+    ) {
+        return true;
+    }
+    if ray_attacked_by(
+        board,
+        sq,
+        by,
+        &ROOK_DIRS,
+        &[PieceKind::Rook, PieceKind::Queen],
+    ) {
+        return true;
+    }
+    false
+}
+
+fn ray_attacked_by(
+    board: &Board,
+    sq: Square,
+    by: Color,
+    dirs: &[(i32, i32)],
+    kinds: &[PieceKind],
+) -> bool {
+    for &(df, dr) in dirs {
+        let mut f = sq.file as i32 + df;
+        let mut r = sq.rank as i32 + dr;
+        while in_bounds(f, r) {
+            if let Some(p) = board.get(Square::new(f as u8, r as u8)) {
+                if p.color == by && kinds.contains(&p.kind) {
+                    return true;
+                }
+                break;
+            }
+            f += df;
+            r += dr;
+        }
+    }
+    false
+}
+
+fn find_king(board: &Board, color: Color) -> Square {
+    for rank in 0..8u8 {
+        for file in 0..8u8 {
+            let sq = Square::new(file, rank);
+            if let Some(p) = board.get(sq) {
+                if p.color == color && p.kind == PieceKind::King {
+                    return sq;
+                }
+            }
+        }
+    }
+    panic!("board has no {color:?} king")
+}
+
+/// Returns whether the side to move's king is currently attacked.
+pub fn is_in_check(board: &Board) -> bool {
+    let color = board.side_to_move;
+    is_square_attacked(board, find_king(board, color), color.opposite())
+}
+
 /// Generates pseudo-legal moves for the side to move: legal piece movement
 /// and capture rules, but without filtering out moves that leave the
 /// mover's own king in check. `legal_moves` does that filtering.
@@ -301,6 +411,61 @@ mod tests {
         assert!(!bishop_moves.iter().any(|m| m.to == Square::new(6, 6)));
         assert!(bishop_moves.iter().any(|m| m.to == Square::new(2, 2)));
         assert!(!bishop_moves.iter().any(|m| m.to == Square::new(1, 1)));
+    }
+
+    #[test]
+    fn is_square_attacked_detects_pawn_attack() {
+        let mut board = Board::empty();
+        board.set(
+            Square::new(3, 3),
+            Some(Piece {
+                kind: PieceKind::Pawn,
+                color: Color::White,
+            }),
+        );
+        assert!(is_square_attacked(&board, Square::new(4, 4), Color::White));
+        assert!(!is_square_attacked(&board, Square::new(4, 2), Color::White));
+    }
+
+    #[test]
+    fn is_square_attacked_detects_rook_ray_through_open_file() {
+        let mut board = Board::empty();
+        board.set(
+            Square::new(0, 0),
+            Some(Piece {
+                kind: PieceKind::Rook,
+                color: Color::Black,
+            }),
+        );
+        assert!(is_square_attacked(&board, Square::new(0, 7), Color::Black));
+        board.set(
+            Square::new(0, 4),
+            Some(Piece {
+                kind: PieceKind::Pawn,
+                color: Color::White,
+            }),
+        );
+        assert!(!is_square_attacked(&board, Square::new(0, 7), Color::Black));
+    }
+
+    #[test]
+    fn is_in_check_detects_check_from_a_queen() {
+        let mut board = Board::empty();
+        board.set(
+            Square::new(4, 0),
+            Some(Piece {
+                kind: PieceKind::King,
+                color: Color::White,
+            }),
+        );
+        board.set(
+            Square::new(4, 7),
+            Some(Piece {
+                kind: PieceKind::Queen,
+                color: Color::Black,
+            }),
+        );
+        assert!(is_in_check(&board));
     }
 
     #[test]
