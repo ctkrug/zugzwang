@@ -16,3 +16,4 @@ pub mod search;
 pub mod square;
 pub mod types;
 pub mod uci;
+pub mod zobrist;
