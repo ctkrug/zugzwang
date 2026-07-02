@@ -85,6 +85,142 @@ impl Board {
         board
     }
 
+    /// Parses a FEN (Forsyth-Edwards Notation) position string.
+    pub fn from_fen(fen: &str) -> Result<Board, String> {
+        let mut fields = fen.split_whitespace();
+        let placement = fields.next().ok_or("FEN is missing piece placement")?;
+        let side = fields.next().unwrap_or("w");
+        let castling_str = fields.next().unwrap_or("-");
+        let en_passant_str = fields.next().unwrap_or("-");
+        let halfmove_str = fields.next().unwrap_or("0");
+        let fullmove_str = fields.next().unwrap_or("1");
+
+        let mut board = Board::empty();
+        let ranks: Vec<&str> = placement.split('/').collect();
+        if ranks.len() != 8 {
+            return Err(format!(
+                "FEN piece placement must have 8 ranks, got {}",
+                ranks.len()
+            ));
+        }
+        for (i, rank_str) in ranks.iter().enumerate() {
+            let rank = 7 - i as u8;
+            let mut file = 0u8;
+            for c in rank_str.chars() {
+                if let Some(skip) = c.to_digit(10) {
+                    file += skip as u8;
+                } else {
+                    if file >= 8 {
+                        return Err(format!("FEN rank '{rank_str}' has too many squares"));
+                    }
+                    let color = if c.is_uppercase() {
+                        Color::White
+                    } else {
+                        Color::Black
+                    };
+                    let kind = match c.to_ascii_lowercase() {
+                        'p' => PieceKind::Pawn,
+                        'n' => PieceKind::Knight,
+                        'b' => PieceKind::Bishop,
+                        'r' => PieceKind::Rook,
+                        'q' => PieceKind::Queen,
+                        'k' => PieceKind::King,
+                        _ => return Err(format!("invalid FEN piece character '{c}'")),
+                    };
+                    board.set(Square::new(file, rank), Some(Piece { kind, color }));
+                    file += 1;
+                }
+            }
+        }
+
+        board.side_to_move = match side {
+            "w" => Color::White,
+            "b" => Color::Black,
+            other => return Err(format!("invalid FEN side to move '{other}'")),
+        };
+
+        board.castling = CastlingRights {
+            white_kingside: castling_str.contains('K'),
+            white_queenside: castling_str.contains('Q'),
+            black_kingside: castling_str.contains('k'),
+            black_queenside: castling_str.contains('q'),
+        };
+
+        board.en_passant = if en_passant_str == "-" {
+            None
+        } else {
+            Some(Square::from_algebraic(en_passant_str)?)
+        };
+
+        board.halfmove_clock = halfmove_str
+            .parse()
+            .map_err(|_| format!("invalid FEN halfmove clock '{halfmove_str}'"))?;
+        board.fullmove_number = fullmove_str
+            .parse()
+            .map_err(|_| format!("invalid FEN fullmove number '{fullmove_str}'"))?;
+
+        Ok(board)
+    }
+
+    /// Renders this position as a FEN (Forsyth-Edwards Notation) string.
+    pub fn to_fen(&self) -> String {
+        let mut placement = String::new();
+        for i in 0..8u8 {
+            let rank = 7 - i;
+            let mut empty_run = 0u8;
+            for file in 0..8u8 {
+                match self.get(Square::new(file, rank)) {
+                    Some(piece) => {
+                        if empty_run > 0 {
+                            placement.push_str(&empty_run.to_string());
+                            empty_run = 0;
+                        }
+                        placement.push(piece_symbol(piece));
+                    }
+                    None => empty_run += 1,
+                }
+            }
+            if empty_run > 0 {
+                placement.push_str(&empty_run.to_string());
+            }
+            if rank != 0 {
+                placement.push('/');
+            }
+        }
+
+        let side = match self.side_to_move {
+            Color::White => "w",
+            Color::Black => "b",
+        };
+
+        let mut castling = String::new();
+        if self.castling.white_kingside {
+            castling.push('K');
+        }
+        if self.castling.white_queenside {
+            castling.push('Q');
+        }
+        if self.castling.black_kingside {
+            castling.push('k');
+        }
+        if self.castling.black_queenside {
+            castling.push('q');
+        }
+        if castling.is_empty() {
+            castling.push('-');
+        }
+
+        let en_passant = self
+            .en_passant
+            .map(|sq| sq.to_algebraic())
+            .unwrap_or_else(|| "-".to_string());
+
+        format!(
+            "{placement} {side} {castling} {en_passant} {} {}",
+            self.halfmove_clock, self.fullmove_number
+        )
+    }
+
     pub fn get(&self, sq: Square) -> Option<Piece> {
         self.squares[sq.index()]
     }
@@ -303,6 +439,55 @@ mod tests {
         assert_eq!(next.get(Square::new(6, 0)).unwrap().kind, PieceKind::King);
         assert_eq!(next.get(Square::new(5, 0)).unwrap().kind, PieceKind::Rook);
         assert!(next.get(Square::new(7, 0)).is_none());
+    }
+
+    #[test]
+    fn from_fen_parses_the_starting_position() {
+        let board =
+            Board::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1").unwrap();
+        assert_eq!(board.side_to_move, Color::White);
+        assert_eq!(board.castling, CastlingRights::ALL);
+        assert_eq!(board.en_passant, None);
+        assert_eq!(board.halfmove_clock, 0);
+        assert_eq!(board.fullmove_number, 1);
+        assert_eq!(board.get(Square::new(4, 0)).unwrap().kind, PieceKind::King);
+    }
+
+    #[test]
+    fn from_fen_parses_castling_rights_and_en_passant() {
+        let board = Board::from_fen("rnbqkbnr/ppp1pppp/8/3pP3/8/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 3")
+            .unwrap();
+        assert_eq!(board.en_passant, Some(Square::new(3, 5)));
+        assert_eq!(board.castling, CastlingRights::ALL);
+    }
+
+    #[test]
+    fn from_fen_rejects_malformed_placement() {
+        assert!(Board::from_fen("not-a-fen").is_err());
+        assert!(Board::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP w KQkq - 0 1").is_err());
+    }
+
+    #[test]
+    fn to_fen_round_trips_the_starting_position() {
+        let board = Board::starting_position();
+        assert_eq!(
+            board.to_fen(),
+            "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+        );
+    }
+
+    #[test]
+    fn fen_round_trip_preserves_arbitrary_positions() {
+        let fens = [
+            "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+            "rnbqkbnr/ppp1pppp/8/3pP3/8/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 3",
+            "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1",
+            "8/8/8/4k3/8/8/8/4K2R w K - 5 39",
+        ];
+        for fen in fens {
+            let board = Board::from_fen(fen).unwrap();
+            assert_eq!(board.to_fen(), fen);
+        }
     }
 
     #[test]
