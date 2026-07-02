@@ -588,6 +588,21 @@ mod tests {
     }
 
     #[test]
+    fn legal_moves_in_double_check_are_king_moves_only() {
+        // White king e1 is checked simultaneously by a queen on e8 (down
+        // the e-file) and a knight on g2 — no single move can block or
+        // capture both attackers, so only king moves resolve either check
+        // and thus stay legal. This isn't special-cased anywhere in
+        // legal_moves; it falls out of filtering every pseudo-legal move
+        // by simulating it and re-checking the king.
+        let board = Board::from_fen("4q3/8/8/8/8/8/6n1/4K3 w - - 0 1").unwrap();
+        assert!(is_in_check(&board));
+        let moves = legal_moves(&board);
+        assert!(!moves.is_empty());
+        assert!(moves.iter().all(|m| m.from == Square::new(4, 0)));
+    }
+
+    #[test]
     fn legal_moves_excludes_king_stepping_into_check() {
         let board = Board::from_fen("4k3/8/8/8/8/8/8/4KR2 b - - 0 1").unwrap();
         let moves = legal_moves(&board);
