@@ -1,3 +1,8 @@
+//! Zugzwang: a from-scratch chess engine.
+//!
+//! `board` and `moves`/`movegen` model the game; `search` and `eval` decide
+//! what to play; `uci` exposes the engine to any UCI-compatible GUI.
+
 pub mod board;
 pub mod eval;
 pub mod movegen;
