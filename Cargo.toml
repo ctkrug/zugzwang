@@ -12,3 +12,7 @@ name = "zugzwang"
 path = "src/main.rs"
 
 [dependencies]
+
+[profile.release]
+lto = true
+codegen-units = 1
