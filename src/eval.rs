@@ -8,7 +8,11 @@ const BISHOP_VALUE: i32 = 330;
 const ROOK_VALUE: i32 = 500;
 const QUEEN_VALUE: i32 = 900;
 
-fn piece_value(kind: PieceKind) -> i32 {
+/// Centipawn value of a piece kind, independent of color or position.
+///
+/// Exposed beyond this module so move ordering can rank captures by the
+/// same material scale the evaluation uses.
+pub fn piece_value(kind: PieceKind) -> i32 {
     match kind {
         PieceKind::Pawn => PAWN_VALUE,
         PieceKind::Knight => KNIGHT_VALUE,
