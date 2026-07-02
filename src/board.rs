@@ -138,6 +138,20 @@ impl Board {
             }
         }
 
+        for color in [Color::White, Color::Black] {
+            let kings = (0..64)
+                .filter(|&i| {
+                    let sq = Square::new((i % 8) as u8, (i / 8) as u8);
+                    board.get(sq) == Some(Piece { kind: PieceKind::King, color })
+                })
+                .count();
+            if kings != 1 {
+                return Err(format!(
+                    "FEN must have exactly one {color:?} king, got {kings}"
+                ));
+            }
+        }
+
         board.side_to_move = match side {
             "w" => Color::White,
             "b" => Color::Black,
@@ -527,6 +541,16 @@ mod tests {
     }
 
     #[test]
+    fn from_fen_rejects_a_position_with_no_white_king() {
+        assert!(Board::from_fen("4k3/8/8/8/8/8/8/8 w - - 0 1").is_err());
+    }
+
+    #[test]
+    fn from_fen_rejects_a_position_with_two_black_kings() {
+        assert!(Board::from_fen("3kk3/8/8/8/8/8/8/4K3 w - - 0 1").is_err());
+    }
+
+    #[test]
     fn from_fen_rejects_an_invalid_side_to_move() {
         assert!(Board::from_fen("8/8/8/8/8/8/8/8 x - - 0 1").is_err());
     }
@@ -551,7 +575,7 @@ mod tests {
         // Only piece placement is strictly required; everything else falls
         // back to a sane default (as some non-standard FEN sources omit
         // the move counters).
-        let board = Board::from_fen("8/8/8/8/8/8/8/8").unwrap();
+        let board = Board::from_fen("4k3/8/8/8/8/8/8/4K3").unwrap();
         assert_eq!(board.side_to_move, Color::White);
         assert_eq!(board.castling, CastlingRights::NONE);
         assert_eq!(board.en_passant, None);
