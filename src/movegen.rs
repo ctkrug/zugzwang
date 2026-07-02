@@ -723,6 +723,38 @@ mod tests {
     }
 
     #[test]
+    fn pawn_capturing_onto_the_back_rank_also_generates_four_promotions() {
+        // A diagonal capture reaching the back rank must expand into the
+        // same four promotion choices as a straight push, not just a
+        // single plain capture — push_pawn_move is shared by both call
+        // sites in pawn_moves, so this pins down that the capture path
+        // actually goes through it.
+        let mut board = Board::empty();
+        board.set(
+            Square::new(0, 6),
+            Some(Piece {
+                kind: PieceKind::Pawn,
+                color: Color::White,
+            }),
+        );
+        board.set(
+            Square::new(1, 7),
+            Some(Piece {
+                kind: PieceKind::Rook,
+                color: Color::Black,
+            }),
+        );
+        let moves = pseudo_legal_moves(&board);
+        let captures: Vec<_> = moves.iter().filter(|m| m.to == Square::new(1, 7)).collect();
+        assert_eq!(captures.len(), 4);
+        let promos: Vec<_> = captures.iter().filter_map(|m| m.promotion).collect();
+        assert!(promos.contains(&PieceKind::Queen));
+        assert!(promos.contains(&PieceKind::Rook));
+        assert!(promos.contains(&PieceKind::Bishop));
+        assert!(promos.contains(&PieceKind::Knight));
+    }
+
+    #[test]
     fn pawn_can_capture_en_passant() {
         let mut board = Board::empty();
         board.set(
