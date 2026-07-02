@@ -1,4 +1,5 @@
 use crate::board::Board;
+use crate::pst;
 use crate::square::Square;
 use crate::types::{Color, PieceKind};
 
@@ -44,6 +45,12 @@ pub fn material_score(board: &Board) -> i32 {
     score
 }
 
+/// Full static evaluation, from White's perspective, in centipawns: raw
+/// material plus a piece-square-table bonus for standing on good squares.
+pub fn evaluate(board: &Board) -> i32 {
+    material_score(board) + pst::score(board)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -52,5 +59,27 @@ mod tests {
     fn starting_position_material_is_balanced() {
         let board = Board::starting_position();
         assert_eq!(material_score(&board), 0);
+    }
+
+    #[test]
+    fn starting_position_evaluation_is_balanced() {
+        let board = Board::starting_position();
+        assert_eq!(evaluate(&board), 0);
+    }
+
+    #[test]
+    fn evaluate_adds_material_and_pst() {
+        // A lone white knight on the rim: material_score is +320, and the
+        // knight's PST value on a1 is negative, so the combined
+        // evaluation should be strictly less than material alone.
+        let mut board = Board::empty();
+        board.set(
+            Square::new(0, 0),
+            Some(crate::board::Piece {
+                kind: PieceKind::Knight,
+                color: Color::White,
+            }),
+        );
+        assert!(evaluate(&board) < material_score(&board));
     }
 }
