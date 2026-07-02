@@ -190,6 +190,15 @@ mod tests {
     }
 
     #[test]
+    fn apply_human_move_rejects_empty_input() {
+        // A blank line (the user just pressing Enter) must be rejected
+        // like any other unparseable move, not panic on an empty string.
+        let board = Board::starting_position();
+        assert!(apply_human_move(&board, "").is_err());
+        assert!(apply_human_move(&board, "   ").is_err());
+    }
+
+    #[test]
     fn apply_human_move_promotes_a_pawn_when_asked() {
         let board = Board::from_fen("k7/4P3/8/8/8/8/8/4K3 w - - 0 1").unwrap();
         let next = apply_human_move(&board, "e7e8q").unwrap();
