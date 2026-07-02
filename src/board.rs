@@ -131,6 +131,11 @@ impl Board {
                     file += 1;
                 }
             }
+            if file != 8 {
+                return Err(format!(
+                    "FEN rank '{rank_str}' must cover exactly 8 squares, got {file}"
+                ));
+            }
         }
 
         board.side_to_move = match side {
@@ -465,6 +470,19 @@ mod tests {
     fn from_fen_rejects_malformed_placement() {
         assert!(Board::from_fen("not-a-fen").is_err());
         assert!(Board::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP w KQkq - 0 1").is_err());
+    }
+
+    #[test]
+    fn from_fen_rejects_a_rank_that_is_too_short() {
+        // "6" only covers six squares; a valid rank must sum to exactly 8.
+        assert!(Board::from_fen("6/8/8/8/8/8/8/8 w - - 0 1").is_err());
+        assert!(Board::from_fen("pppppp/8/8/8/8/8/8/8 w - - 0 1").is_err());
+    }
+
+    #[test]
+    fn from_fen_rejects_a_rank_that_is_too_long() {
+        // A single "9" skip code overshoots the 8 squares in a rank.
+        assert!(Board::from_fen("9/8/8/8/8/8/8/8 w - - 0 1").is_err());
     }
 
     #[test]
