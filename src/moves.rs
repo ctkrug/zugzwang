@@ -68,4 +68,27 @@ mod tests {
         mv.promotion = Some(PieceKind::Queen);
         assert_eq!(mv.to_uci(), "e7e8q");
     }
+
+    #[test]
+    fn to_uci_formats_all_four_promotion_pieces() {
+        for (kind, letter) in [
+            (PieceKind::Queen, 'q'),
+            (PieceKind::Rook, 'r'),
+            (PieceKind::Bishop, 'b'),
+            (PieceKind::Knight, 'n'),
+        ] {
+            let mut mv = Move::new(Square::new(0, 6), Square::new(0, 7));
+            mv.promotion = Some(kind);
+            assert_eq!(mv.to_uci(), format!("a7a8{letter}"));
+        }
+    }
+
+    #[test]
+    fn to_uci_formats_castling_as_a_plain_coordinate_move() {
+        // UCI has no special castling notation: a castle is just the
+        // king's own from/to squares, same as any other king move.
+        let mut mv = Move::new(Square::new(4, 0), Square::new(6, 0));
+        mv.kind = MoveKind::CastleKingside;
+        assert_eq!(mv.to_uci(), "e1g1");
+    }
 }
