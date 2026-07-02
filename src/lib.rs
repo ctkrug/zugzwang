@@ -5,6 +5,7 @@
 
 pub mod board;
 pub mod eval;
+pub mod killers;
 pub mod movegen;
 pub mod moves;
 pub mod ordering;
