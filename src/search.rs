@@ -3,8 +3,10 @@ use crate::eval::material_score;
 use crate::history::HistoryTable;
 use crate::killers::KillerMoves;
 use crate::movegen::{is_in_check, legal_moves};
+use crate::moves::Move;
 use crate::ordering::{is_capture, order_moves};
 use crate::types::Color;
+use std::time::{Duration, Instant};
 
 /// Score magnitude assigned to a checkmate found at the root (ply 0).
 /// Mates found deeper in the tree score `MATE_SCORE - ply`, so the search
@@ -75,6 +77,58 @@ impl Search {
             }
         }
         best
+    }
+
+    /// Iterative deepening from the root: searches depth 1, then 2, and so
+    /// on, until `budget` elapses, returning the best move and score found
+    /// by the deepest depth that finished. Each completed depth also warms
+    /// up the killer and history tables the next, deeper depth reuses.
+    ///
+    /// The time check happens between root moves, not inside deeper plies,
+    /// so a depth already in progress when the budget expires is allowed to
+    /// finish rather than being cut off mid-move.
+    pub fn find_best_move(&mut self, board: &Board, budget: Duration) -> Option<(Move, i32)> {
+        let deadline = Instant::now() + budget;
+        let mut best = None;
+        let mut depth = 1;
+        while Instant::now() < deadline {
+            match self.root_search(board, depth, deadline) {
+                Some(result) => best = Some(result),
+                None => break,
+            }
+            depth += 1;
+        }
+        best
+    }
+
+    /// Searches every root move to `depth` and returns the best one found,
+    /// or `None` if `deadline` was already reached before finishing.
+    fn root_search(&mut self, board: &Board, depth: u32, deadline: Instant) -> Option<(Move, i32)> {
+        let mut moves = legal_moves(board);
+        if moves.is_empty() {
+            return None;
+        }
+        order_moves(board, &mut moves, self.killers.get(0), &self.history);
+
+        let mut alpha = -MATE_SCORE;
+        let beta = MATE_SCORE;
+        let mut best_move = moves[0];
+        let mut best_score = i32::MIN + 1;
+        for mv in moves {
+            if Instant::now() >= deadline {
+                return None;
+            }
+            let next = board.make_move(mv);
+            let score = -self.negamax(&next, depth - 1, 1, -beta, -alpha);
+            if score > best_score {
+                best_score = score;
+                best_move = mv;
+            }
+            if best_score > alpha {
+                alpha = best_score;
+            }
+        }
+        Some((best_move, best_score))
     }
 }
 
