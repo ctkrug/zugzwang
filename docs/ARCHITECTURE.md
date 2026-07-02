@@ -38,10 +38,14 @@ src/
   uci.rs        UCI command loop: uci/isready/ucinewgame/position/go/stop/quit. Tracks the
                 game as a Board; go derives a time budget from movetime or wtime/btime/
                 movestogo and calls Search::find_best_move.
-  play.rs       Pure logic for the terminal play mode (game_status, apply_human_move,
-                engine_reply) — no I/O, so it's unit-tested directly.
+  play.rs       Pure logic for the terminal play mode (game_status — checkmate/stalemate/
+                fifty-move draw off the current Board alone, is_threefold_repetition — a
+                third occurrence of the current position's hash in a caller-supplied
+                history, apply_human_move, engine_reply) — no I/O, so it's unit-tested
+                directly.
   main.rs       CLI entrypoint: default (prints the board), `uci`, `play` (interactive loop
-                built on play.rs), `perft <depth> [fen]`.
+                built on play.rs, tracking each position's Zobrist hash across the game for
+                repetition detection), `perft <depth> [fen]`.
 ```
 
 ## Data flow
@@ -90,3 +94,8 @@ cargo fmt
   budget) before the next stdin line is read, so there's never an in-flight search to interrupt.
 - Terminal play and UCI `moves` both use coordinate algebraic notation (`e2e4`, not SAN like
   `Nf3`) — there's no SAN parser.
+- Fifty-move and threefold-repetition draw detection (`play::game_status` /
+  `play::is_threefold_repetition`) only end a terminal-play game; the search itself has no
+  notion of them, so it can't yet steer toward or away from a repetition it would otherwise
+  want, and UCI mode (which only tracks the position, not full game-over state) doesn't surface
+  either draw type at all.
