@@ -12,7 +12,9 @@ src/
   square.rs     Square (file/rank), algebraic <-> index conversions.
   moves.rs      Move (from, to, promotion, MoveKind) and its UCI long-algebraic rendering.
   board.rs      Board: 8x8 array of Option<Piece> + side to move, castling, en passant, clocks.
-                FEN parse/serialize, make_move (pure — returns a new Board), Display.
+                FEN parse/serialize (rejecting a placement without exactly one king per side —
+                movegen's own king lookup panics otherwise), make_move (pure — returns a new
+                Board), Display.
   movegen.rs    pseudo_legal_moves, legal_moves (filters self-check), is_in_check,
                 is_square_attacked, perft, find_uci_move.
   eval.rs       material_score + pst::score combined into evaluate (White-relative centipawns),
@@ -34,15 +36,17 @@ src/
                 stores its result after, skipping mate-adjacent scores since those are ply-
                 relative. Depth-0 leaves extend into quiescence (capture-only search) instead of
                 returning the raw eval, to avoid the horizon effect. find_best_move does
-                iterative deepening against a wall-clock budget.
+                iterative deepening against a wall-clock budget; find_best_move_to_depth instead
+                iterates to an exact depth with no time limit, for a UCI `go depth` request.
   uci.rs        UCI command loop: uci/isready/ucinewgame/position/go/stop/quit. Tracks the
-                game as a Board; go derives a time budget from movetime or wtime/btime/
-                movestogo and calls Search::find_best_move.
+                game as a Board; go honors an explicit `depth` exactly via
+                Search::find_best_move_to_depth, otherwise derives a time budget from movetime
+                or wtime/btime/movestogo and calls Search::find_best_move.
   play.rs       Pure logic for the terminal play mode (game_status — checkmate/stalemate/
-                fifty-move draw off the current Board alone, is_threefold_repetition — a
-                third occurrence of the current position's hash in a caller-supplied
-                history, apply_human_move, engine_reply) — no I/O, so it's unit-tested
-                directly.
+                fifty-move draw/insufficient-material draw off the current Board alone,
+                is_threefold_repetition — a third occurrence of the current position's hash in
+                a caller-supplied history, apply_human_move, engine_reply) — no I/O, so it's
+                unit-tested directly.
   main.rs       CLI entrypoint: no args prints the board, `uci`, `play` (interactive loop
                 built on play.rs, tracking each position's Zobrist hash across the game for
                 repetition detection), `perft <depth> [fen]`; any other subcommand is a
@@ -95,8 +99,8 @@ cargo fmt
   budget) before the next stdin line is read, so there's never an in-flight search to interrupt.
 - Terminal play and UCI `moves` both use coordinate algebraic notation (`e2e4`, not SAN like
   `Nf3`) — there's no SAN parser.
-- Fifty-move and threefold-repetition draw detection (`play::game_status` /
-  `play::is_threefold_repetition`) only end a terminal-play game; the search itself has no
-  notion of them, so it can't yet steer toward or away from a repetition it would otherwise
-  want, and UCI mode (which only tracks the position, not full game-over state) doesn't surface
-  either draw type at all.
+- Fifty-move, insufficient-material, and threefold-repetition draw detection
+  (`play::game_status` / `play::is_threefold_repetition`) only end a terminal-play game; the
+  search itself has no notion of them, so it can't yet steer toward or away from a repetition it
+  would otherwise want, and UCI mode (which only tracks the position, not full game-over state)
+  doesn't surface any of the three at all.
