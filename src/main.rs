@@ -1,8 +1,11 @@
 use std::io::{self, BufRead, Write};
 use zugzwang::board::Board;
 use zugzwang::movegen::perft;
-use zugzwang::play::{apply_human_move, engine_reply, game_status, GameStatus};
+use zugzwang::play::{
+    apply_human_move, engine_reply, game_status, is_threefold_repetition, GameStatus,
+};
 use zugzwang::uci;
+use zugzwang::zobrist;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -26,6 +29,7 @@ fn main() {
 fn run_play() {
     let stdin = io::stdin();
     let mut board = Board::starting_position();
+    let mut history = vec![zobrist::hash(&board)];
     println!("{board}");
 
     loop {
@@ -48,8 +52,9 @@ fn run_play() {
                 continue;
             }
         };
+        history.push(zobrist::hash(&board));
         println!("{board}");
-        if report_game_over(&board) {
+        if report_game_over(&board, &history) {
             break;
         }
 
@@ -58,30 +63,39 @@ fn run_play() {
         };
         println!("Engine plays {}", mv.to_uci());
         board = next;
+        history.push(zobrist::hash(&board));
         println!("{board}");
-        if report_game_over(&board) {
+        if report_game_over(&board, &history) {
             break;
         }
     }
 }
 
-/// Prints a message and returns `true` if `board` is a finished game.
-fn report_game_over(board: &Board) -> bool {
+/// Prints a message and returns `true` if `board` is a finished game,
+/// checking `history` (the Zobrist hash of every position reached so far,
+/// including the current one) for a draw by threefold repetition alongside
+/// the single-position outcomes `game_status` can determine on its own.
+fn report_game_over(board: &Board, history: &[u64]) -> bool {
     match game_status(board) {
         GameStatus::Checkmate => {
             println!("Checkmate.");
-            true
+            return true;
         }
         GameStatus::Stalemate => {
             println!("Stalemate.");
-            true
+            return true;
         }
         GameStatus::FiftyMoveDraw => {
             println!("Draw by the fifty-move rule.");
-            true
+            return true;
         }
-        GameStatus::Ongoing => false,
+        GameStatus::Ongoing => {}
     }
+    if is_threefold_repetition(history) {
+        println!("Draw by threefold repetition.");
+        return true;
+    }
+    false
 }
 
 /// Runs `perft <depth> [fen]`, printing the node count at every depth from

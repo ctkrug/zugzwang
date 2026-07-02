@@ -57,6 +57,18 @@ pub fn engine_reply(board: &Board) -> Option<(Move, Board)> {
         .map(|(mv, _)| (mv, board.make_move(mv)))
 }
 
+/// Whether the most recent position in `history` (the Zobrist hash of every
+/// position reached so far in the game, including the current one) has now
+/// occurred a third time — a draw by threefold repetition. `Board` itself
+/// has no memory of prior positions, so callers that play out a full game
+/// (like terminal play) must accumulate this history themselves.
+pub fn is_threefold_repetition(history: &[u64]) -> bool {
+    match history.last() {
+        Some(&current) => history.iter().filter(|&&h| h == current).count() >= 3,
+        None => false,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -123,5 +135,27 @@ mod tests {
     fn engine_reply_returns_none_with_no_legal_moves() {
         let board = Board::from_fen("k7/Q7/1K6/8/8/8/8/8 b - - 0 1").unwrap();
         assert!(engine_reply(&board).is_none());
+    }
+
+    #[test]
+    fn is_threefold_repetition_is_false_with_no_history() {
+        assert!(!is_threefold_repetition(&[]));
+    }
+
+    #[test]
+    fn is_threefold_repetition_is_false_below_three_occurrences() {
+        assert!(!is_threefold_repetition(&[1, 2, 1]));
+    }
+
+    #[test]
+    fn is_threefold_repetition_is_true_on_the_third_occurrence() {
+        assert!(is_threefold_repetition(&[1, 2, 1, 3, 1]));
+    }
+
+    #[test]
+    fn is_threefold_repetition_only_counts_the_current_position() {
+        // Position `2` has occurred three times, but the game is currently
+        // at position `1` (the last entry), which has only occurred once.
+        assert!(!is_threefold_repetition(&[2, 2, 2, 1]));
     }
 }
