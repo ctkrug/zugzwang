@@ -151,6 +151,27 @@ mod tests {
     }
 
     #[test]
+    fn king_is_rewarded_for_a_castled_corner_over_the_open_center() {
+        // The KING table rewards early-game safety (tucked behind pawns on
+        // the back rank) over centralization — the opposite priority from
+        // every other piece — since an exposed king in the middle of an
+        // open board is a liability, not an asset.
+        let mut board = Board::empty();
+        let castled = Square::new(6, 0);
+        let center = Square::new(3, 3);
+        let king = crate::board::Piece {
+            kind: PieceKind::King,
+            color: Color::White,
+        };
+        board.set(castled, Some(king));
+        let castled_score = score(&board);
+        board.set(castled, None);
+        board.set(center, Some(king));
+        let center_score = score(&board);
+        assert!(castled_score > center_score);
+    }
+
+    #[test]
     fn white_and_black_pawn_advancement_are_mirrored() {
         // A white pawn one step from promoting and a black pawn one step
         // from promoting should be rewarded identically in magnitude.
