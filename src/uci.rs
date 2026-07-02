@@ -2,12 +2,23 @@ use crate::board::Board;
 use crate::movegen::legal_moves;
 use crate::moves::Move;
 use crate::search::Search;
+use crate::types::Color;
 use std::io::{self, BufRead, Write};
 use std::time::Duration;
 
-/// Time budget for a `go` with no time control specified. Real time
-/// management (`wtime`/`btime`/`movestogo`) lands separately.
+/// Time budget for a `go` with no time control at all (no `movetime` and no
+/// `wtime`/`btime` for the side to move).
 const DEFAULT_MOVE_TIME: Duration = Duration::from_secs(1);
+
+/// Floor and ceiling on the budget derived from `wtime`/`btime`, so neither
+/// a near-flagging clock nor a huge one drives the search to an extreme.
+const MIN_MOVE_TIME_MS: u64 = 50;
+const MAX_MOVE_TIME_MS: u64 = 5_000;
+
+/// Plies-to-go assumed when `movestogo` isn't given, i.e. sudden-death time
+/// control: spend a conservative slice of the clock on each move rather
+/// than trying to budget for the entire rest of the game.
+const DEFAULT_MOVES_TO_GO: u64 = 30;
 
 /// Runs the UCI command loop over stdin/stdout.
 ///
@@ -35,11 +46,16 @@ pub fn run() {
                 board = new_board;
             }
         } else if line == "go" || line.starts_with("go ") {
-            let best = Search::new().find_best_move(&board, DEFAULT_MOVE_TIME);
+            let args = line.strip_prefix("go").unwrap_or("").trim();
+            let budget = move_time(args, board.side_to_move);
+            let best = Search::new().find_best_move(&board, budget);
             let uci_move = best
                 .map(|(mv, _)| mv.to_uci())
                 .unwrap_or_else(|| "0000".to_string());
             let _ = writeln!(stdout, "bestmove {uci_move}");
+        } else if line == "stop" {
+            // `go` runs synchronously to completion before the next line is
+            // read, so there is never a search in flight to interrupt.
         } else if line == "quit" {
             break;
         }
@@ -68,6 +84,41 @@ fn parse_position(args: &str) -> Option<Board> {
         board = board.make_move(find_move(&board, uci_move)?);
     }
     Some(board)
+}
+
+/// Derives a search time budget from a `go` command's arguments.
+///
+/// `movetime <ms>` is honored directly. Otherwise, the side to move's own
+/// clock (`wtime`/`btime`) is divided by `movestogo` (or
+/// `DEFAULT_MOVES_TO_GO` if absent) and clamped to a sane range. With
+/// neither present, falls back to `DEFAULT_MOVE_TIME`.
+fn move_time(args: &str, side_to_move: Color) -> Duration {
+    let tokens: Vec<&str> = args.split_whitespace().collect();
+    let value_after = |key: &str| -> Option<u64> {
+        tokens
+            .iter()
+            .position(|&t| t == key)
+            .and_then(|i| tokens.get(i + 1))
+            .and_then(|v| v.parse().ok())
+    };
+
+    if let Some(movetime) = value_after("movetime") {
+        return Duration::from_millis(movetime);
+    }
+
+    let own_time = match side_to_move {
+        Color::White => value_after("wtime"),
+        Color::Black => value_after("btime"),
+    };
+    let Some(remaining_ms) = own_time else {
+        return DEFAULT_MOVE_TIME;
+    };
+
+    let moves_to_go = value_after("movestogo")
+        .unwrap_or(DEFAULT_MOVES_TO_GO)
+        .max(1);
+    let budget_ms = (remaining_ms / moves_to_go).clamp(MIN_MOVE_TIME_MS, MAX_MOVE_TIME_MS);
+    Duration::from_millis(budget_ms)
 }
 
 fn find_move(board: &Board, uci: &str) -> Option<Move> {
@@ -115,5 +166,38 @@ mod tests {
     #[test]
     fn parse_position_rejects_illegal_move() {
         assert!(parse_position("startpos moves e2e5").is_none());
+    }
+
+    #[test]
+    fn move_time_honors_explicit_movetime() {
+        let budget = move_time("movetime 250 wtime 60000", Color::White);
+        assert_eq!(budget, Duration::from_millis(250));
+    }
+
+    #[test]
+    fn move_time_divides_own_clock_by_movestogo() {
+        let budget = move_time("wtime 30000 btime 30000 movestogo 10", Color::White);
+        assert_eq!(budget, Duration::from_millis(3_000));
+    }
+
+    #[test]
+    fn move_time_reads_the_clock_for_the_side_to_move() {
+        let budget = move_time("wtime 100000 btime 1000 movestogo 20", Color::Black);
+        assert_eq!(
+            budget,
+            Duration::from_millis(MIN_MOVE_TIME_MS.max(1000 / 20))
+        );
+    }
+
+    #[test]
+    fn move_time_falls_back_to_default_with_no_time_control() {
+        assert_eq!(move_time("", Color::White), DEFAULT_MOVE_TIME);
+        assert_eq!(move_time("infinite", Color::White), DEFAULT_MOVE_TIME);
+    }
+
+    #[test]
+    fn move_time_clamps_a_huge_budget() {
+        let budget = move_time("wtime 100000000 movestogo 1", Color::White);
+        assert_eq!(budget, Duration::from_millis(MAX_MOVE_TIME_MS));
     }
 }
