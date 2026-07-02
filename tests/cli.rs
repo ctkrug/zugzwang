@@ -44,3 +44,53 @@ fn uci_mode_answers_go_with_a_legal_bestmove() {
     assert!(chars.next().unwrap().is_ascii_lowercase());
     assert!(chars.next().unwrap().is_ascii_digit());
 }
+
+#[test]
+fn perft_command_prints_known_node_counts_for_the_starting_position() {
+    let output = Command::new(env!("CARGO_BIN_EXE_zugzwang"))
+        .args(["perft", "3"])
+        .output()
+        .expect("failed to run binary");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert_eq!(
+        stdout.lines().collect::<Vec<_>>(),
+        vec!["perft(1) = 20", "perft(2) = 400", "perft(3) = 8902"]
+    );
+}
+
+#[test]
+fn perft_command_accepts_an_arbitrary_fen() {
+    let output = Command::new(env!("CARGO_BIN_EXE_zugzwang"))
+        .args([
+            "perft",
+            "1",
+            "4k3/8/8/3p4/4P3/8/8/4K3",
+            "w",
+            "-",
+            "-",
+            "0",
+            "1",
+        ])
+        .output()
+        .expect("failed to run binary");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // From this position: 5 king moves plus 2 pawn moves (push to e5,
+    // capture on d5) = 7.
+    assert_eq!(stdout.trim(), "perft(1) = 7");
+}
+
+#[test]
+fn perft_command_rejects_a_malformed_fen() {
+    let output = Command::new(env!("CARGO_BIN_EXE_zugzwang"))
+        .args(["perft", "1", "not-a-fen"])
+        .output()
+        .expect("failed to run binary");
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("invalid FEN"));
+}
