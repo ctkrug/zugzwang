@@ -10,6 +10,7 @@ pub mod killers;
 pub mod movegen;
 pub mod moves;
 pub mod ordering;
+pub mod play;
 pub mod search;
 pub mod square;
 pub mod types;
