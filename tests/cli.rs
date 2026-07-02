@@ -14,6 +14,18 @@ fn prints_starting_board_by_default() {
 }
 
 #[test]
+fn rejects_an_unrecognized_subcommand() {
+    let output = Command::new(env!("CARGO_BIN_EXE_zugzwang"))
+        .args(["bogus"])
+        .output()
+        .expect("failed to run binary");
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("unknown command 'bogus'"));
+}
+
+#[test]
 fn uci_mode_answers_go_with_a_legal_bestmove() {
     let mut child = Command::new(env!("CARGO_BIN_EXE_zugzwang"))
         .arg("uci")

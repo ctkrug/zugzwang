@@ -13,7 +13,12 @@ fn main() {
         Some("uci") => uci::run(),
         Some("perft") => run_perft(&args[2..]),
         Some("play") => run_play(),
-        _ => {
+        Some(other) => {
+            eprintln!("unknown command '{other}'");
+            eprintln!("usage: zugzwang [uci|perft <depth> [fen]|play]");
+            std::process::exit(1);
+        }
+        None => {
             let board = Board::starting_position();
             println!("Zugzwang chess engine");
             print!("{board}");
