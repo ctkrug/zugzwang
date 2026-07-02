@@ -1,5 +1,5 @@
 use crate::square::Square;
-use crate::types::{Color, PieceKind};
+use crate::types::{CastlingRights, Color, PieceKind};
 use std::fmt;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -8,14 +8,21 @@ pub struct Piece {
     pub color: Color,
 }
 
-/// Board state as a flat 8x8 array of optional pieces.
+/// Board state as a flat 8x8 array of optional pieces, plus the rest of a
+/// chess position: side to move, castling rights, the en passant target
+/// square (if any), and the two FEN move counters.
 ///
-/// A bitboard representation is planned for the build phase once move
-/// generation needs the extra performance; the array keeps this scaffold
-/// simple to read and test.
+/// A bitboard representation is planned for a later performance pass; the
+/// array keeps move generation simple to read and test while it's being
+/// built out and validated against perft.
+#[derive(Clone, Copy)]
 pub struct Board {
     squares: [Option<Piece>; 64],
     pub side_to_move: Color,
+    pub castling: CastlingRights,
+    pub en_passant: Option<Square>,
+    pub halfmove_clock: u32,
+    pub fullmove_number: u32,
 }
 
 impl Board {
@@ -23,12 +30,17 @@ impl Board {
         Board {
             squares: [None; 64],
             side_to_move: Color::White,
+            castling: CastlingRights::NONE,
+            en_passant: None,
+            halfmove_clock: 0,
+            fullmove_number: 1,
         }
     }
 
     /// Builds a board set up for the standard chess starting position.
     pub fn starting_position() -> Self {
         let mut board = Board::empty();
+        board.castling = CastlingRights::ALL;
         let back_rank = [
             PieceKind::Rook,
             PieceKind::Knight,
