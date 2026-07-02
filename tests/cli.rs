@@ -46,6 +46,56 @@ fn uci_mode_answers_go_with_a_legal_bestmove() {
 }
 
 #[test]
+fn uci_mode_ignores_unknown_commands_without_crashing() {
+    let mut child = Command::new(env!("CARGO_BIN_EXE_zugzwang"))
+        .arg("uci")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("failed to run binary");
+
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(b"uci\nbanana\nisready\nquit\n")
+        .unwrap();
+
+    let output = child.wait_with_output().expect("engine did not exit");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("uciok"));
+    assert!(stdout.contains("readyok"));
+}
+
+#[test]
+fn uci_mode_keeps_the_prior_position_after_a_malformed_position_command() {
+    let mut child = Command::new(env!("CARGO_BIN_EXE_zugzwang"))
+        .arg("uci")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("failed to run binary");
+
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(b"position startpos moves e2e4\nposition fen not-a-fen\ngo movetime 50\nquit\n")
+        .unwrap();
+
+    let output = child.wait_with_output().expect("engine did not exit");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // A rejected `position fen` must not clobber the board with an empty
+    // or partial position — the engine should still find a legal reply
+    // from the position set by the last valid `position` command.
+    assert!(stdout
+        .lines()
+        .any(|line| line.starts_with("bestmove ") && !line.contains("0000")));
+}
+
+#[test]
 fn perft_command_prints_known_node_counts_for_the_starting_position() {
     let output = Command::new(env!("CARGO_BIN_EXE_zugzwang"))
         .args(["perft", "3"])
