@@ -5,3 +5,4 @@ pub mod moves;
 pub mod search;
 pub mod square;
 pub mod types;
+pub mod uci;
