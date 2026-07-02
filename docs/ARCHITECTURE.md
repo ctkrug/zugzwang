@@ -15,14 +15,19 @@ src/
                 FEN parse/serialize, make_move (pure — returns a new Board), Display.
   movegen.rs    pseudo_legal_moves, legal_moves (filters self-check), is_in_check,
                 is_square_attacked, perft, find_uci_move.
-  eval.rs       material_score (White-relative centipawns) and the shared piece_value table.
+  eval.rs       material_score + pst::score combined into evaluate (White-relative centipawns),
+                plus the shared piece_value table.
+  pst.rs        Piece-square tables (one per piece kind), mirrored for Black instead of
+                duplicated, rewarding pieces for standing on typically-good squares.
   ordering.rs   order_moves: ranks a move list captures-first (MVV-LVA), then killer moves,
                 then history-scored quiets. Tiered scoring (see comments) keeps each signal
                 strictly dominant over the ones below it.
   killers.rs    KillerMoves: two per-ply killer-quiet-move slots.
   history.rs    HistoryTable: butterfly from/to cutoff-frequency table.
   search.rs     Search: negamax + alpha-beta, owns a KillerMoves + HistoryTable for the whole
-                tree. find_best_move does iterative deepening against a wall-clock budget.
+                tree. Depth-0 leaves extend into quiescence (capture-only search) instead of
+                returning the raw eval, to avoid the horizon effect. find_best_move does
+                iterative deepening against a wall-clock budget.
   uci.rs        UCI command loop: uci/isready/ucinewgame/position/go/stop/quit. Tracks the
                 game as a Board; go derives a time budget from movetime or wtime/btime/
                 movestogo and calls Search::find_best_move.
@@ -68,8 +73,8 @@ cargo fmt
 
 - The board is a flat `[Option<Piece>; 64]`, not bitboards — simple and correct, not fast.
 - No transposition table yet: `Search` doesn't cache positions across nodes or across `go` calls.
-- No quiescence search: `negamax`'s leaf evaluation is plain material, so tactical positions can
-  suffer from the horizon effect.
+- Quiescence only extends captures, not check evasions, so a position where the side to move is
+  in check at the search horizon can still misjudge a forced reply.
 - UCI `stop` is a recognized no-op: `go` runs synchronously to completion (bounded by its time
   budget) before the next stdin line is read, so there's never an in-flight search to interrupt.
 - Terminal play and UCI `moves` both use coordinate algebraic notation (`e2e4`, not SAN like
