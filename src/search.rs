@@ -347,6 +347,16 @@ mod tests {
     }
 
     #[test]
+    fn find_best_move_to_depth_treats_a_zero_depth_as_depth_one() {
+        // `go depth 0` isn't meaningful chess input, but the engine must
+        // still hand back a legal move rather than None (which uci::run
+        // renders as the forfeit-signaling "bestmove 0000").
+        let board = Board::starting_position();
+        let (mv, _) = Search::new().find_best_move_to_depth(&board, 0).unwrap();
+        assert!(legal_moves(&board).contains(&mv));
+    }
+
+    #[test]
     fn find_best_move_to_depth_searches_the_exact_requested_depth() {
         // Depth 1 is enough to spot a hanging pawn, so a depth-1 request
         // must return the capture even though a deeper search might find
