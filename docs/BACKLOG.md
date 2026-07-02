@@ -23,7 +23,7 @@ Turns legal moves into a decision: what's the best move in this position, right 
 - [x] Implement alpha-beta pruning on top of the existing negamax skeleton.
 - [ ] Add iterative deepening with a configurable time budget.
 - [ ] Implement Zobrist hashing and a transposition table keyed by position hash.
-- [ ] Add move ordering (MVV-LVA for captures, killer moves, history heuristic) so alpha-beta
+- [x] Add move ordering (MVV-LVA for captures, killer moves, history heuristic) so alpha-beta
       pruning is effective.
 - [ ] Extend evaluation with piece-square tables and add quiescence search to avoid the
       horizon effect on tactical positions.
