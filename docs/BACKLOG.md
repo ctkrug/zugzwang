@@ -35,6 +35,6 @@ Makes the engine usable — by a GUI over UCI, or directly in a terminal.
 - [x] Wire the `position` and `go` UCI commands to the search, including `bestmove` output.
 - [x] Support `ucinewgame`, `stop`, and time-control parameters (`wtime`/`btime`/`movestogo`).
 - [ ] Add a terminal play mode with algebraic move input and board rendering after each move.
-- [ ] Add a `perft` debug command for validating move generation from an arbitrary FEN.
+- [x] Add a `perft` debug command for validating move generation from an arbitrary FEN.
 - [ ] Play a full game end-to-end against a real UCI GUI (e.g. CuteChess) and fix any protocol
       gaps found in the process.
