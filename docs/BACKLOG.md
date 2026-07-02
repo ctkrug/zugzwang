@@ -32,7 +32,7 @@ Turns legal moves into a decision: what's the best move in this position, right 
 
 Makes the engine usable — by a GUI over UCI, or directly in a terminal.
 
-- [ ] Wire the `position` and `go` UCI commands to the search, including `bestmove` output.
+- [x] Wire the `position` and `go` UCI commands to the search, including `bestmove` output.
 - [ ] Support `ucinewgame`, `stop`, and time-control parameters (`wtime`/`btime`/`movestogo`).
 - [ ] Add a terminal play mode with algebraic move input and board rendering after each move.
 - [ ] Add a `perft` debug command for validating move generation from an arbitrary FEN.
