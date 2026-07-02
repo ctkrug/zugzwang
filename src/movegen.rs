@@ -641,6 +641,19 @@ mod tests {
     }
 
     #[test]
+    fn perft_position_five_matches_known_node_counts() {
+        // The standard chess-programming-wiki "Position 5" perft suite
+        // entry: a distinct pin/discovered-check/underpromotion mix from
+        // Kiwipete, so it catches bugs the other reference positions
+        // wouldn't.
+        let board =
+            Board::from_fen("rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8").unwrap();
+        assert_eq!(perft(&board, 1), 44);
+        assert_eq!(perft(&board, 2), 1_486);
+        assert_eq!(perft(&board, 3), 62_379);
+    }
+
+    #[test]
     fn castling_available_when_squares_clear_and_safe() {
         let board = Board::from_fen("r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1").unwrap();
         let moves = pseudo_legal_moves(&board);
