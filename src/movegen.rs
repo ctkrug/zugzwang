@@ -654,6 +654,19 @@ mod tests {
     }
 
     #[test]
+    fn perft_position_three_matches_known_node_counts() {
+        // The standard chess-programming-wiki "Position 3" perft suite
+        // entry: no castling rights at all, so it isolates pawn/king/rook
+        // endgame move generation (including en passant) from any
+        // castling-related bug.
+        let board = Board::from_fen("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1").unwrap();
+        assert_eq!(perft(&board, 1), 14);
+        assert_eq!(perft(&board, 2), 191);
+        assert_eq!(perft(&board, 3), 2_812);
+        assert_eq!(perft(&board, 4), 43_238);
+    }
+
+    #[test]
     fn castling_available_when_squares_clear_and_safe() {
         let board = Board::from_fen("r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1").unwrap();
         let moves = pseudo_legal_moves(&board);
