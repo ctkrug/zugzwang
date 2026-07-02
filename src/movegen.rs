@@ -582,7 +582,7 @@ mod tests {
         // White king on e1, a white knight pinned on e4 by a black rook on
         // e8. A knight can never move without leaving the e-file, so every
         // pseudo-legal knight move here is illegal.
-        let board = Board::from_fen("4r3/8/8/8/4N3/8/8/4K3 w - - 0 1").unwrap();
+        let board = Board::from_fen("4r2k/8/8/8/4N3/8/8/4K3 w - - 0 1").unwrap();
         let moves = legal_moves(&board);
         assert!(!moves.iter().any(|m| m.from == Square::new(4, 3)));
     }
@@ -595,7 +595,7 @@ mod tests {
         // and thus stay legal. This isn't special-cased anywhere in
         // legal_moves; it falls out of filtering every pseudo-legal move
         // by simulating it and re-checking the king.
-        let board = Board::from_fen("4q3/8/8/8/8/8/6n1/4K3 w - - 0 1").unwrap();
+        let board = Board::from_fen("4q2k/8/8/8/8/8/6n1/4K3 w - - 0 1").unwrap();
         assert!(is_in_check(&board));
         let moves = legal_moves(&board);
         assert!(!moves.is_empty());
