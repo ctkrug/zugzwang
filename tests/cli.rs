@@ -46,6 +46,34 @@ fn uci_mode_answers_go_with_a_legal_bestmove() {
 }
 
 #[test]
+fn uci_mode_replies_with_a_legal_move_to_a_zero_movetime() {
+    let mut child = Command::new(env!("CARGO_BIN_EXE_zugzwang"))
+        .arg("uci")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("failed to run binary");
+
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(b"position startpos\ngo movetime 0\nquit\n")
+        .unwrap();
+
+    let output = child.wait_with_output().expect("engine did not exit");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let bestmove_line = stdout
+        .lines()
+        .find(|line| line.starts_with("bestmove "))
+        .expect("no bestmove line in output");
+    // "0000" is the null move, which most GUIs read as a forfeit; a fresh
+    // starting position always has legal moves, so it must never appear.
+    assert_ne!(bestmove_line, "bestmove 0000");
+}
+
+#[test]
 fn uci_mode_ignores_unknown_commands_without_crashing() {
     let mut child = Command::new(env!("CARGO_BIN_EXE_zugzwang"))
         .arg("uci")
