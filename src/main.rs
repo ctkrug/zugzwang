@@ -12,10 +12,10 @@ fn main() {
     match args.get(1).map(String::as_str) {
         Some("uci") => uci::run(),
         Some("perft") => run_perft(&args[2..]),
-        Some("play") => run_play(),
+        Some("play") => run_play(&args[2..]),
         Some(other) => {
             eprintln!("unknown command '{other}'");
-            eprintln!("usage: zugzwang [uci|perft <depth> [fen]|play]");
+            eprintln!("usage: zugzwang [uci|perft <depth> [fen]|play [fen]]");
             std::process::exit(1);
         }
         None => {
@@ -31,11 +31,30 @@ fn main() {
 /// promotion); the engine replies as Black. The board is printed after
 /// every move, human or engine, and the game ends on checkmate,
 /// stalemate, `quit`, or end of input.
-fn run_play() {
+///
+/// Starts from the standard starting position, or from `args`' FEN (joined
+/// back into one string, the same convention `run_perft` uses) if given —
+/// handy for practicing a specific endgame or studying a particular
+/// middlegame without playing all the way there first.
+fn run_play(args: &[String]) {
+    let mut board = if args.is_empty() {
+        Board::starting_position()
+    } else {
+        match Board::from_fen(&args.join(" ")) {
+            Ok(board) => board,
+            Err(err) => {
+                eprintln!("invalid FEN: {err}");
+                std::process::exit(1);
+            }
+        }
+    };
+
     let stdin = io::stdin();
-    let mut board = Board::starting_position();
     let mut history = vec![zobrist::hash(&board)];
     println!("{board}");
+    if report_game_over(&board, &history) {
+        return;
+    }
 
     loop {
         print!("Your move (or 'quit'): ");
