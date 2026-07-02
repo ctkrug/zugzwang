@@ -1,0 +1,14 @@
+[package]
+name = "zugzwang"
+version = "0.1.0"
+edition = "2021"
+authors = ["Charlie Krug"]
+description = "A from-scratch terminal chess engine with alpha-beta search and a UCI interface"
+license = "MIT"
+repository = "https://github.com/ctkrug/zugzwang"
+
+[[bin]]
+name = "zugzwang"
+path = "src/main.rs"
+
+[dependencies]
