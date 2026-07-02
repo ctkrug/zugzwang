@@ -66,6 +66,24 @@ mod tests {
     }
 
     #[test]
+    fn from_algebraic_rejects_a_zero_rank_and_empty_input() {
+        assert!(Square::from_algebraic("a0").is_err());
+        assert!(Square::from_algebraic("").is_err());
+    }
+
+    #[test]
+    fn from_algebraic_rejects_uppercase_file_letters() {
+        // Standard algebraic notation is lowercase-only; "E4" isn't valid
+        // UCI input, unlike the case-insensitive FEN piece letters.
+        assert!(Square::from_algebraic("E4").is_err());
+    }
+
+    #[test]
+    fn from_algebraic_rejects_trailing_garbage() {
+        assert!(Square::from_algebraic("e4x").is_err());
+    }
+
+    #[test]
     fn from_index_matches_index() {
         for i in 0..64 {
             assert_eq!(Square::from_index(i).index(), i);
