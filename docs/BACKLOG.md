@@ -11,9 +11,9 @@ The foundation everything else depends on: a correct board and fully legal move 
 - [ ] Implement FEN parsing and serialization (`Board::from_fen` / `Board::to_fen`).
 - [ ] Implement pseudo-legal move generation for all six piece types, including castling,
       en passant, and promotion.
-- [ ] Implement check detection and legal-move filtering (pins, moving into check, castling
+- [x] Implement check detection and legal-move filtering (pins, moving into check, castling
       through/out of check).
-- [ ] Validate move generation against a perft test suite for known positions through at
+- [x] Validate move generation against a perft test suite for known positions through at
       least depth 5.
 
 ## Epic 2: Search & Evaluation
