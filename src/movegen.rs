@@ -586,6 +586,35 @@ mod tests {
     }
 
     #[test]
+    fn perft_starting_position_matches_known_node_counts() {
+        let board = Board::starting_position();
+        assert_eq!(perft(&board, 1), 20);
+        assert_eq!(perft(&board, 2), 400);
+        assert_eq!(perft(&board, 3), 8_902);
+        assert_eq!(perft(&board, 4), 197_281);
+    }
+
+    #[test]
+    #[ignore = "slow in debug builds; run with `cargo test --release -- --ignored`"]
+    fn perft_starting_position_depth_five_matches_known_node_count() {
+        let board = Board::starting_position();
+        assert_eq!(perft(&board, 5), 4_865_609);
+    }
+
+    #[test]
+    fn perft_kiwipete_matches_known_node_counts() {
+        // The standard "Kiwipete" position exercises castling, en passant,
+        // and promotions all at once.
+        let board = Board::from_fen(
+            "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1",
+        )
+        .unwrap();
+        assert_eq!(perft(&board, 1), 48);
+        assert_eq!(perft(&board, 2), 2_039);
+        assert_eq!(perft(&board, 3), 97_862);
+    }
+
+    #[test]
     fn castling_available_when_squares_clear_and_safe() {
         let board = Board::from_fen("r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1").unwrap();
         let moves = pseudo_legal_moves(&board);
