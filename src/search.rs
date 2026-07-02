@@ -52,3 +52,36 @@ fn perspective_score(board: &Board) -> i32 {
         Color::Black => -material_score(board),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn negamax_scores_checkmate_as_a_loss_for_the_mated_side() {
+        // Black king boxed in on a8, white queen delivers mate on a7
+        // covered by the white king on b6; black has no legal reply.
+        let board = Board::from_fen("k7/Q7/1K6/8/8/8/8/8 b - - 0 1").unwrap();
+        let score = negamax(&board, 4, 0, -MATE_SCORE, MATE_SCORE);
+        assert_eq!(score, -(MATE_SCORE));
+    }
+
+    #[test]
+    fn negamax_scores_stalemate_as_a_draw() {
+        // Black king on h8 has no legal move (g8/g7/h7 all covered by the
+        // white king on g6 and queen on f7) and is not itself in check.
+        let board = Board::from_fen("7k/5Q2/6K1/8/8/8/8/8 b - - 0 1").unwrap();
+        let score = negamax(&board, 4, 0, -MATE_SCORE, MATE_SCORE);
+        assert_eq!(score, 0);
+    }
+
+    #[test]
+    fn negamax_prefers_a_free_pawn_capture() {
+        // White to move: a pawn on e4 can capture a hanging pawn on d5
+        // with nothing recapturing, so the position should score as
+        // favorable for White at even a shallow depth.
+        let board = Board::from_fen("4k3/8/8/3p4/4P3/8/8/4K3 w - - 0 1").unwrap();
+        let score = negamax(&board, 1, 0, -MATE_SCORE, MATE_SCORE);
+        assert!(score > 0);
+    }
+}
