@@ -190,6 +190,19 @@ impl Search {
         Some(best)
     }
 
+    /// Searches to exactly `depth` with no time limit, for a UCI `go depth`
+    /// request: unlike `find_best_move`, which treats depth as a target to
+    /// iterate toward within a time budget, this honors the requested depth
+    /// precisely regardless of how long it takes.
+    pub fn find_best_move_to_depth(&mut self, board: &Board, depth: u32) -> Option<(Move, i32)> {
+        let no_deadline = Instant::now() + Duration::from_secs(3600);
+        let mut best = self.root_search(board, 1, no_deadline)?;
+        for d in 2..=depth {
+            best = self.root_search(board, d, no_deadline)?;
+        }
+        Some(best)
+    }
+
     /// Searches every root move to `depth` and returns the best one found,
     /// or `None` if `deadline` was already reached before finishing.
     fn root_search(&mut self, board: &Board, depth: u32, deadline: Instant) -> Option<(Move, i32)> {
@@ -331,6 +344,17 @@ mod tests {
             .unwrap();
         assert_ne!(mv.to_uci(), "d1d7");
         assert!(score > -400, "expected no material-down score, got {score}");
+    }
+
+    #[test]
+    fn find_best_move_to_depth_searches_the_exact_requested_depth() {
+        // Depth 1 is enough to spot a hanging pawn, so a depth-1 request
+        // must return the capture even though a deeper search might find
+        // something else first in move ordering.
+        let board = Board::from_fen("4k3/8/8/3p4/4P3/8/8/4K3 w - - 0 1").unwrap();
+        let (mv, score) = Search::new().find_best_move_to_depth(&board, 1).unwrap();
+        assert_eq!(mv.to_uci(), "e4d5");
+        assert!(score > 0);
     }
 
     #[test]
