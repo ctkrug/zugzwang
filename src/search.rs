@@ -217,6 +217,27 @@ mod tests {
     }
 
     #[test]
+    fn quiescence_sees_past_a_hanging_queen_to_the_recapture() {
+        // Black to move, right after White played Qxe5, capturing a rook:
+        // a white queen now sits on e5, a black pawn on d6 can recapture
+        // it with dxe5. A plain material snapshot of this exact position
+        // says Black is down a queen for nothing (the horizon effect); a
+        // quiescence-aware search instead plays out dxe5 and finds Black
+        // is actually the one ahead, having traded a rook for a queen.
+        let board = Board::from_fen("k7/8/3p4/4Q3/8/8/8/K7 b - - 0 1").unwrap();
+        let naive = -crate::eval::evaluate(&board);
+        let quiesced = Search::new().negamax(&board, 0, 0, -MATE_SCORE, MATE_SCORE);
+        assert!(
+            naive < -500,
+            "expected the naive snapshot to look bad, got {naive}"
+        );
+        assert!(
+            quiesced > 0,
+            "expected quiescence to find Black ahead after dxe5, got {quiesced}"
+        );
+    }
+
+    #[test]
     fn find_best_move_finds_a_mate_in_one() {
         // White queen on h7 has several mating slides along the 7th rank
         // and 8th rank (e.g. a7# or g8#). A mate found at ply 1 dominates
