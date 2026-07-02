@@ -27,8 +27,8 @@ game start to finish. That's the difference between a toy and an engine.
 - **Evaluation** — material plus piece-square tables, rewarding pieces for standing on
   typically-good squares, not just for existing.
 - **UCI protocol** — `uci` mode speaks the Universal Chess Interface (`uci`, `isready`,
-  `ucinewgame`, `position`, `go` with `movetime`/`wtime`/`btime`/`movestogo`, `stop`, `quit`)
-  over stdin/stdout, so any UCI-compatible GUI can drive it.
+  `ucinewgame`, `position`, `go` with `depth`/`movetime`/`wtime`/`btime`/`movestogo`, `stop`,
+  `quit`) over stdin/stdout, so any UCI-compatible GUI can drive it.
 - **Terminal play** — `play` mode for playing a full game directly in the terminal, no GUI
   required.
 - **Perft debug command** — `perft <depth> [fen]` prints node counts per depth for validating
