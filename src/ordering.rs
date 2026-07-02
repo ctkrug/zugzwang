@@ -1,41 +1,50 @@
 use crate::board::Board;
 use crate::eval::piece_value;
+use crate::history::HistoryTable;
 use crate::moves::{Move, MoveKind};
 use crate::types::PieceKind;
 
-/// Score given to the primary and secondary killer move at a node. Chosen
-/// well below the minimum possible capture score (a pawn taking a queen
-/// scores at least `100 * 16 - 900 = 700`) so killers always sort after
-/// every capture but ahead of the remaining, unscored quiet moves.
-const PRIMARY_KILLER_SCORE: i32 = 2;
-const SECONDARY_KILLER_SCORE: i32 = 1;
+/// Score tiers, from highest to lowest priority. Each tier occupies a
+/// disjoint range far wider than any score that can occur within it, so a
+/// move's tier always dominates its in-tier score when moves are compared.
+const CAPTURE_TIER: i32 = 3_000_000;
+const KILLER_TIER: i32 = 2_000_000;
+const HISTORY_TIER: i32 = 1_000_000;
 
 /// Sorts `moves` so alpha-beta explores the most promising ones first.
 ///
-/// Captures sort first, ranked by MVV-LVA (most valuable victim, least
-/// valuable attacker): a pawn taking a queen sorts before a queen taking a
-/// pawn, since the former is far more likely to hold up after the
-/// opponent's reply. Next come `killers`, quiet moves that caused a beta
-/// cutoff at this ply in a sibling branch. Remaining quiet moves keep their
-/// generation order.
-pub fn order_moves(board: &Board, moves: &mut [Move], killers: [Option<Move>; 2]) {
-    moves.sort_by_key(|&mv| std::cmp::Reverse(order_score(board, mv, killers)));
+/// Ordering, highest priority first:
+/// 1. Captures, ranked by MVV-LVA (most valuable victim, least valuable
+///    attacker): a pawn taking a queen sorts before a queen taking a pawn,
+///    since the former is far more likely to hold up after the opponent's
+///    reply.
+/// 2. `killers`, quiet moves that caused a beta cutoff at this ply in a
+///    sibling branch.
+/// 3. Remaining quiet moves, ranked by `history` — how often that from/to
+///    pair has caused a cutoff anywhere in the tree so far.
+pub fn order_moves(
+    board: &Board,
+    moves: &mut [Move],
+    killers: [Option<Move>; 2],
+    history: &HistoryTable,
+) {
+    moves.sort_by_key(|&mv| std::cmp::Reverse(order_score(board, mv, killers, history)));
 }
 
-fn order_score(board: &Board, mv: Move, killers: [Option<Move>; 2]) -> i32 {
+fn order_score(board: &Board, mv: Move, killers: [Option<Move>; 2], history: &HistoryTable) -> i32 {
     if let Some(victim) = capture_victim(board, mv) {
         let attacker = board
             .get(mv.from)
             .expect("move has a piece on its from-square");
-        return piece_value(victim) * 16 - piece_value(attacker.kind);
+        return CAPTURE_TIER + piece_value(victim) * 16 - piece_value(attacker.kind);
     }
     if killers[0] == Some(mv) {
-        return PRIMARY_KILLER_SCORE;
+        return KILLER_TIER + 1;
     }
     if killers[1] == Some(mv) {
-        return SECONDARY_KILLER_SCORE;
+        return KILLER_TIER;
     }
-    0
+    HISTORY_TIER + history.get(mv)
 }
 
 fn capture_victim(board: &Board, mv: Move) -> Option<PieceKind> {
@@ -65,7 +74,7 @@ mod tests {
             Move::new(Square::new(3, 0), Square::new(3, 1)),
             Move::new(Square::new(3, 0), Square::new(3, 6)),
         ];
-        order_moves(&board, &mut moves, [None, None]);
+        order_moves(&board, &mut moves, [None, None], &HistoryTable::new());
         assert_eq!(moves[0].to, Square::new(3, 6));
     }
 
@@ -79,7 +88,7 @@ mod tests {
             Move::new(Square::new(3, 0), Square::new(3, 5)),
             Move::new(Square::new(2, 4), Square::new(3, 5)),
         ];
-        order_moves(&board, &mut moves, [None, None]);
+        order_moves(&board, &mut moves, [None, None], &HistoryTable::new());
         assert_eq!(moves[0].from, Square::new(2, 4));
     }
 
@@ -92,7 +101,12 @@ mod tests {
             killer,
             Move::new(Square::new(3, 1), Square::new(3, 2)),
         ];
-        order_moves(&board, &mut moves, [Some(killer), None]);
+        order_moves(
+            &board,
+            &mut moves,
+            [Some(killer), None],
+            &HistoryTable::new(),
+        );
         assert_eq!(moves[0], killer);
     }
 
@@ -104,7 +118,24 @@ mod tests {
         let capture = Move::new(Square::new(3, 0), Square::new(3, 6));
         let killer = Move::new(Square::new(6, 0), Square::new(5, 2));
         let mut moves = vec![killer, capture];
-        order_moves(&board, &mut moves, [Some(killer), None]);
+        order_moves(
+            &board,
+            &mut moves,
+            [Some(killer), None],
+            &HistoryTable::new(),
+        );
         assert_eq!(moves[0], capture);
+    }
+
+    #[test]
+    fn higher_history_score_ranks_a_quiet_move_first() {
+        let board = Board::starting_position();
+        let strong = Move::new(Square::new(4, 1), Square::new(4, 2));
+        let weak = Move::new(Square::new(3, 1), Square::new(3, 2));
+        let mut history = HistoryTable::new();
+        history.record(strong, 4);
+        let mut moves = vec![weak, strong];
+        order_moves(&board, &mut moves, [None, None], &history);
+        assert_eq!(moves[0], strong);
     }
 }
