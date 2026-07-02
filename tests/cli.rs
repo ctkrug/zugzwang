@@ -86,6 +86,31 @@ fn uci_mode_replies_with_a_legal_move_to_a_zero_movetime() {
 }
 
 #[test]
+fn uci_mode_go_depth_finds_a_free_capture() {
+    // A hanging pawn is visible at depth 1; `go depth 1` should find and
+    // play the capture, proving the depth token is actually honored
+    // rather than silently falling back to a fixed time budget.
+    let mut child = Command::new(env!("CARGO_BIN_EXE_zugzwang"))
+        .arg("uci")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("failed to run binary");
+
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(b"position fen 4k3/8/8/3p4/4P3/8/8/4K3 w - - 0 1\ngo depth 1\nquit\n")
+        .unwrap();
+
+    let output = child.wait_with_output().expect("engine did not exit");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.lines().any(|line| line == "bestmove e4d5"));
+}
+
+#[test]
 fn uci_mode_ucinewgame_resets_the_tracked_board() {
     let mut child = Command::new(env!("CARGO_BIN_EXE_zugzwang"))
         .arg("uci")
