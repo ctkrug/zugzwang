@@ -25,7 +25,7 @@ Turns legal moves into a decision: what's the best move in this position, right 
 - [ ] Implement Zobrist hashing and a transposition table keyed by position hash.
 - [x] Add move ordering (MVV-LVA for captures, killer moves, history heuristic) so alpha-beta
       pruning is effective.
-- [ ] Extend evaluation with piece-square tables and add quiescence search to avoid the
+- [x] Extend evaluation with piece-square tables and add quiescence search to avoid the
       horizon effect on tactical positions.
 
 ## Epic 3: UCI Protocol & Terminal Play
