@@ -605,10 +605,9 @@ mod tests {
     fn perft_kiwipete_matches_known_node_counts() {
         // The standard "Kiwipete" position exercises castling, en passant,
         // and promotions all at once.
-        let board = Board::from_fen(
-            "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1",
-        )
-        .unwrap();
+        let board =
+            Board::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1")
+                .unwrap();
         assert_eq!(perft(&board, 1), 48);
         assert_eq!(perft(&board, 2), 2_039);
         assert_eq!(perft(&board, 3), 97_862);
