@@ -1,5 +1,5 @@
 use crate::board::Board;
-use crate::eval::material_score;
+use crate::eval::evaluate;
 use crate::history::HistoryTable;
 use crate::killers::KillerMoves;
 use crate::movegen::{is_in_check, legal_moves};
@@ -138,12 +138,13 @@ impl Default for Search {
     }
 }
 
-/// Material score, sign-flipped so it reads as "how good is this position
-/// for the side to move" rather than always from White's perspective.
+/// Static evaluation, sign-flipped so it reads as "how good is this
+/// position for the side to move" rather than always from White's
+/// perspective.
 fn perspective_score(board: &Board) -> i32 {
     match board.side_to_move {
-        Color::White => material_score(board),
-        Color::Black => -material_score(board),
+        Color::White => evaluate(board),
+        Color::Black => -evaluate(board),
     }
 }
 
