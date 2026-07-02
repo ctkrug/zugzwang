@@ -1,6 +1,5 @@
 use crate::board::Board;
-use crate::movegen::legal_moves;
-use crate::moves::Move;
+use crate::movegen::find_uci_move;
 use crate::search::Search;
 use crate::types::Color;
 use std::io::{self, BufRead, Write};
@@ -81,7 +80,7 @@ fn parse_position(args: &str) -> Option<Board> {
     };
 
     for &uci_move in moves {
-        board = board.make_move(find_move(&board, uci_move)?);
+        board = board.make_move(find_uci_move(&board, uci_move)?);
     }
     Some(board)
 }
@@ -119,10 +118,6 @@ fn move_time(args: &str, side_to_move: Color) -> Duration {
         .max(1);
     let budget_ms = (remaining_ms / moves_to_go).clamp(MIN_MOVE_TIME_MS, MAX_MOVE_TIME_MS);
     Duration::from_millis(budget_ms)
-}
-
-fn find_move(board: &Board, uci: &str) -> Option<Move> {
-    legal_moves(board).into_iter().find(|mv| mv.to_uci() == uci)
 }
 
 #[cfg(test)]
