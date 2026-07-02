@@ -46,8 +46,13 @@ pub fn run() {
             }
         } else if line == "go" || line.starts_with("go ") {
             let args = line.strip_prefix("go").unwrap_or("").trim();
-            let budget = move_time(args, board.side_to_move);
-            let best = Search::new().find_best_move(&board, budget);
+            let best = match go_depth(args) {
+                Some(depth) => Search::new().find_best_move_to_depth(&board, depth),
+                None => {
+                    let budget = move_time(args, board.side_to_move);
+                    Search::new().find_best_move(&board, budget)
+                }
+            };
             let uci_move = best
                 .map(|(mv, _)| mv.to_uci())
                 .unwrap_or_else(|| "0000".to_string());
@@ -85,6 +90,25 @@ fn parse_position(args: &str) -> Option<Board> {
     Some(board)
 }
 
+/// Reads the numeric value following `key` in a whitespace-tokenized `go`
+/// argument list, e.g. `token_value("wtime 30000", "wtime") == Some(30000)`.
+fn token_value(args: &str, key: &str) -> Option<u64> {
+    let tokens: Vec<&str> = args.split_whitespace().collect();
+    tokens
+        .iter()
+        .position(|&t| t == key)
+        .and_then(|i| tokens.get(i + 1))
+        .and_then(|v| v.parse().ok())
+}
+
+/// Parses a `go depth <n>` request, so it can be honored exactly instead of
+/// falling back to a time-boxed search: a GUI or analysis tool asking for a
+/// specific depth expects that depth, not whatever iterative deepening
+/// happens to reach within `DEFAULT_MOVE_TIME`.
+fn go_depth(args: &str) -> Option<u32> {
+    token_value(args, "depth").map(|d| d as u32)
+}
+
 /// Derives a search time budget from a `go` command's arguments.
 ///
 /// `movetime <ms>` is honored directly. Otherwise, the side to move's own
@@ -92,14 +116,7 @@ fn parse_position(args: &str) -> Option<Board> {
 /// `DEFAULT_MOVES_TO_GO` if absent) and clamped to a sane range. With
 /// neither present, falls back to `DEFAULT_MOVE_TIME`.
 fn move_time(args: &str, side_to_move: Color) -> Duration {
-    let tokens: Vec<&str> = args.split_whitespace().collect();
-    let value_after = |key: &str| -> Option<u64> {
-        tokens
-            .iter()
-            .position(|&t| t == key)
-            .and_then(|i| tokens.get(i + 1))
-            .and_then(|v| v.parse().ok())
-    };
+    let value_after = |key: &str| token_value(args, key);
 
     if let Some(movetime) = value_after("movetime") {
         return Duration::from_millis(movetime);
@@ -161,6 +178,18 @@ mod tests {
     #[test]
     fn parse_position_rejects_illegal_move() {
         assert!(parse_position("startpos moves e2e5").is_none());
+    }
+
+    #[test]
+    fn go_depth_reads_an_explicit_depth() {
+        assert_eq!(go_depth("depth 6"), Some(6));
+        assert_eq!(go_depth("wtime 30000 depth 4"), Some(4));
+    }
+
+    #[test]
+    fn go_depth_is_none_without_a_depth_token() {
+        assert_eq!(go_depth("movetime 250"), None);
+        assert_eq!(go_depth(""), None);
     }
 
     #[test]
