@@ -111,6 +111,31 @@ fn uci_mode_go_depth_finds_a_free_capture() {
 }
 
 #[test]
+fn uci_mode_go_depth_one_still_finds_a_free_promotion() {
+    // End-to-end confidence that a queening push is correctly chosen
+    // over every other legal move (three king shuffles) through the
+    // real UCI command loop, not just in an isolated search unit test.
+    let mut child = Command::new(env!("CARGO_BIN_EXE_zugzwang"))
+        .arg("uci")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("failed to run binary");
+
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(b"position fen 7k/4P3/8/8/8/8/8/K7 w - - 0 1\ngo depth 1\nquit\n")
+        .unwrap();
+
+    let output = child.wait_with_output().expect("engine did not exit");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.lines().any(|line| line == "bestmove e7e8q"));
+}
+
+#[test]
 fn uci_mode_ucinewgame_resets_the_tracked_board() {
     let mut child = Command::new(env!("CARGO_BIN_EXE_zugzwang"))
         .arg("uci")
