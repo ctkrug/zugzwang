@@ -125,6 +125,26 @@ mod tests {
     }
 
     #[test]
+    fn transposed_move_orders_hash_the_same() {
+        // 1.Nf3 Nf6 2.Nc3 Nc6 and 1.Nc3 Nc6 2.Nf3 Nf6 reach the identical
+        // position by different move orders — exactly the case a
+        // transposition table exists to exploit, so their hashes (and not
+        // just their FENs) must match.
+        use crate::movegen::find_uci_move;
+        let play = |moves: &[&str]| {
+            let mut board = Board::starting_position();
+            for &uci in moves {
+                board = board.make_move(find_uci_move(&board, uci).unwrap());
+            }
+            board
+        };
+        let a = play(&["g1f3", "g8f6", "b1c3", "b8c6"]);
+        let b = play(&["b1c3", "b8c6", "g1f3", "g8f6"]);
+        assert_eq!(a.to_fen(), b.to_fen());
+        assert_eq!(hash(&a), hash(&b));
+    }
+
+    #[test]
     fn side_to_move_affects_the_hash() {
         let white = Board::from_fen("4k3/8/8/8/8/8/8/4K3 w - - 0 1").unwrap();
         let black = Board::from_fen("4k3/8/8/8/8/8/8/4K3 b - - 0 1").unwrap();
