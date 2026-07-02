@@ -39,3 +39,14 @@ pub fn material_score(board: &Board) -> i32 {
     }
     score
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn starting_position_material_is_balanced() {
+        let board = Board::starting_position();
+        assert_eq!(material_score(&board), 0);
+    }
+}
