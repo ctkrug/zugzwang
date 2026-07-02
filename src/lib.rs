@@ -14,6 +14,7 @@ pub mod play;
 pub mod pst;
 pub mod search;
 pub mod square;
+pub mod tt;
 pub mod types;
 pub mod uci;
 pub mod zobrist;
