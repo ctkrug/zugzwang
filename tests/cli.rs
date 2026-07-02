@@ -271,6 +271,20 @@ fn perft_command_rejects_a_malformed_fen() {
 }
 
 #[test]
+fn perft_command_at_depth_zero_prints_nothing() {
+    // `perft <d>` prints depths 1..=d; depth 0 is an empty range, so the
+    // command should exit cleanly with no output rather than erroring or
+    // printing a spurious "perft(0) = 1" line.
+    let output = Command::new(env!("CARGO_BIN_EXE_zugzwang"))
+        .args(["perft", "0"])
+        .output()
+        .expect("failed to run binary");
+
+    assert!(output.status.success());
+    assert!(String::from_utf8_lossy(&output.stdout).is_empty());
+}
+
+#[test]
 fn perft_command_rejects_a_fen_with_no_king() {
     // A structurally valid FEN (8 ranks, 8 squares each, legal piece
     // letters) that's missing a king used to panic deep in move
