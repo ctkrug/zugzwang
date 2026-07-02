@@ -21,9 +21,9 @@ src/
                 plus the shared piece_value table.
   pst.rs        Piece-square tables (one per piece kind), mirrored for Black instead of
                 duplicated, rewarding pieces for standing on typically-good squares.
-  ordering.rs   order_moves: ranks a move list captures-first (MVV-LVA), then killer moves,
-                then history-scored quiets. Tiered scoring (see comments) keeps each signal
-                strictly dominant over the ones below it.
+  ordering.rs   order_moves: ranks a move list captures-first (MVV-LVA), then non-capturing
+                promotions, then killer moves, then history-scored quiets. Tiered scoring (see
+                comments) keeps each signal strictly dominant over the ones below it.
   killers.rs    KillerMoves: two per-ply killer-quiet-move slots.
   history.rs    HistoryTable: butterfly from/to cutoff-frequency table.
   zobrist.rs    hash: Zobrist hash of a position (pieces, side to move, castling, en passant),
