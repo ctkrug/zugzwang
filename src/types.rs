@@ -24,3 +24,14 @@ pub enum PieceKind {
     Queen,
     King,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn opposite_toggles_color() {
+        assert_eq!(Color::White.opposite(), Color::Black);
+        assert_eq!(Color::Black.opposite(), Color::White);
+    }
+}
