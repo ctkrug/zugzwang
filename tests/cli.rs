@@ -94,3 +94,26 @@ fn perft_command_rejects_a_malformed_fen() {
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("invalid FEN"));
 }
+
+#[test]
+fn play_mode_rejects_an_illegal_move_then_plays_a_legal_one() {
+    let mut child = Command::new(env!("CARGO_BIN_EXE_zugzwang"))
+        .arg("play")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("failed to run binary");
+
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(b"e2e5\ne2e4\nquit\n")
+        .unwrap();
+
+    let output = child.wait_with_output().expect("engine did not exit");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("illegal move: e2e5"));
+    assert!(stdout.contains("Engine plays "));
+}
