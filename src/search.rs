@@ -54,7 +54,7 @@ impl Search {
             };
         }
         if depth == 0 {
-            return perspective_score(board);
+            return self.quiescence(board, alpha, beta);
         }
         order_moves(board, &mut moves, self.killers.get(ply), &self.history);
 
@@ -77,6 +77,42 @@ impl Search {
             }
         }
         best
+    }
+
+    /// Quiescence search: extends a leaf with capture-only search until the
+    /// position is "quiet" (no captures left, or the best capture doesn't
+    /// help), so `negamax`'s depth cutoff doesn't stop mid-exchange and
+    /// misread a position where a piece is about to be recaptured (the
+    /// horizon effect).
+    ///
+    /// Uses the static evaluation as a lower bound ("stand pat"): a side
+    /// can always choose not to capture, so if just standing there already
+    /// beats `beta`, or beats `alpha`, that's folded in before trying any
+    /// capture.
+    fn quiescence(&mut self, board: &Board, mut alpha: i32, beta: i32) -> i32 {
+        let stand_pat = perspective_score(board);
+        if stand_pat >= beta {
+            return beta;
+        }
+        if stand_pat > alpha {
+            alpha = stand_pat;
+        }
+
+        let mut captures = legal_moves(board);
+        captures.retain(|&mv| is_capture(board, mv));
+        order_moves(board, &mut captures, [None, None], &self.history);
+
+        for mv in captures {
+            let next = board.make_move(mv);
+            let score = -self.quiescence(&next, -beta, -alpha);
+            if score >= beta {
+                return beta;
+            }
+            if score > alpha {
+                alpha = score;
+            }
+        }
+        alpha
     }
 
     /// Iterative deepening from the root: searches depth 1, then 2, and so
