@@ -180,6 +180,22 @@ pub fn legal_moves(board: &Board) -> Vec<Move> {
         .collect()
 }
 
+/// Counts leaf nodes of the legal-move tree to `depth` plies, the standard
+/// correctness benchmark for move generators (perft).
+pub fn perft(board: &Board, depth: u32) -> u64 {
+    if depth == 0 {
+        return 1;
+    }
+    let moves = legal_moves(board);
+    if depth == 1 {
+        return moves.len() as u64;
+    }
+    moves
+        .iter()
+        .map(|&mv| perft(&board.make_move(mv), depth - 1))
+        .sum()
+}
+
 /// Generates castling moves for the side to move, applying the standard
 /// rules beyond "the right hasn't been lost": the king isn't currently in
 /// check, the squares it passes through and lands on aren't attacked, and
