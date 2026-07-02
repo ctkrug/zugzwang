@@ -383,6 +383,18 @@ mod tests {
     }
 
     #[test]
+    fn display_renders_ranks_top_down_with_dots_for_empty_squares() {
+        let board = Board::starting_position();
+        let rendered = board.to_string();
+        let lines: Vec<&str> = rendered.lines().collect();
+        assert_eq!(lines.len(), 8);
+        // Rank 8 (Black's back rank) is printed first.
+        assert_eq!(lines[0], "r n b q k b n r ");
+        assert_eq!(lines[2], ". . . . . . . . ");
+        assert_eq!(lines[7], "R N B Q K B N R ");
+    }
+
+    #[test]
     fn make_move_relocates_the_piece_and_flips_side_to_move() {
         let board = Board::starting_position();
         let mv = crate::moves::Move::new(Square::new(4, 1), Square::new(4, 3));
