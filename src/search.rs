@@ -144,11 +144,15 @@ impl Search {
             alpha = stand_pat;
         }
 
-        let mut captures = legal_moves(board);
-        captures.retain(|&mv| is_capture(board, mv));
-        order_moves(board, &mut captures, [None, None], &self.history);
+        // A non-capturing promotion is just as "loud" as a capture: letting
+        // quiescence stop right before a pawn queens would hand back a
+        // static eval that still prices it as a pawn, the same horizon
+        // effect this search exists to avoid for captures.
+        let mut tactical = legal_moves(board);
+        tactical.retain(|&mv| is_capture(board, mv) || mv.promotion.is_some());
+        order_moves(board, &mut tactical, [None, None], &self.history);
 
-        for mv in captures {
+        for mv in tactical {
             let next = board.make_move(mv);
             let score = -self.quiescence(&next, -beta, -alpha);
             if score >= beta {
@@ -300,6 +304,22 @@ mod tests {
         assert!(
             quiesced > 0,
             "expected quiescence to find Black ahead after dxe5, got {quiesced}"
+        );
+    }
+
+    #[test]
+    fn quiescence_sees_a_free_promotion_with_no_captures_available() {
+        // White to move: a pawn on b7 can promote with nothing to stop or
+        // recapture it, and there are no captures on the board at all.
+        // Quiescence must still search that non-capturing promotion, not
+        // just captures, or it stops one ply too early and prices the
+        // position as if the pawn were still worth a pawn.
+        let board = Board::from_fen("7k/4P3/8/8/8/8/8/K7 w - - 0 1").unwrap();
+        let static_eval = crate::eval::evaluate(&board);
+        let quiesced = Search::new().negamax(&board, 0, 0, -MATE_SCORE, MATE_SCORE);
+        assert!(
+            quiesced > static_eval + 500,
+            "expected quiescence to find the promotion, got {quiesced} vs static {static_eval}"
         );
     }
 
