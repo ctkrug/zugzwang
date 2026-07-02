@@ -94,6 +94,10 @@ fn report_game_over(board: &Board, history: &[u64]) -> bool {
             println!("Draw by the fifty-move rule.");
             return true;
         }
+        GameStatus::InsufficientMaterial => {
+            println!("Draw by insufficient material.");
+            return true;
+        }
         GameStatus::Ongoing => {}
     }
     if is_threefold_repetition(history) {
