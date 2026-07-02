@@ -27,7 +27,7 @@ pub fn negamax(board: &Board, depth: u32, ply: u32, mut alpha: i32, beta: i32) -
     if depth == 0 {
         return perspective_score(board);
     }
-    order_moves(board, &mut moves);
+    order_moves(board, &mut moves, [None, None]);
 
     let mut best = i32::MIN + 1;
     for mv in moves {
