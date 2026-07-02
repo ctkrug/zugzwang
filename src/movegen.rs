@@ -3,6 +3,28 @@ use crate::moves::{Move, MoveKind};
 use crate::square::Square;
 use crate::types::{Color, PieceKind};
 
+const KNIGHT_OFFSETS: [(i32, i32); 8] = [
+    (1, 2),
+    (2, 1),
+    (2, -1),
+    (1, -2),
+    (-1, -2),
+    (-2, -1),
+    (-2, 1),
+    (-1, 2),
+];
+
+const KING_OFFSETS: [(i32, i32); 8] = [
+    (1, 0),
+    (1, 1),
+    (0, 1),
+    (-1, 1),
+    (-1, 0),
+    (-1, -1),
+    (0, -1),
+    (1, -1),
+];
+
 fn in_bounds(file: i32, rank: i32) -> bool {
     (0..8).contains(&file) && (0..8).contains(&rank)
 }
@@ -13,7 +35,40 @@ fn in_bounds(file: i32, rank: i32) -> bool {
 pub fn pseudo_legal_moves(board: &Board) -> Vec<Move> {
     let mut moves = Vec::new();
     pawn_moves(board, &mut moves);
+    step_moves(board, &mut moves, PieceKind::Knight, &KNIGHT_OFFSETS);
+    step_moves(board, &mut moves, PieceKind::King, &KING_OFFSETS);
     moves
+}
+
+/// Generates single-step moves (knight jumps or king steps) for every piece
+/// of `kind` belonging to the side to move: a move onto an empty square or
+/// an enemy-occupied one (a capture), never onto a friendly piece.
+fn step_moves(board: &Board, moves: &mut Vec<Move>, kind: PieceKind, offsets: &[(i32, i32)]) {
+    let color = board.side_to_move;
+    for rank in 0..8u8 {
+        for file in 0..8u8 {
+            let from = Square::new(file, rank);
+            let Some(piece) = board.get(from) else {
+                continue;
+            };
+            if piece.color != color || piece.kind != kind {
+                continue;
+            }
+            for &(df, dr) in offsets {
+                let f = file as i32 + df;
+                let r = rank as i32 + dr;
+                if !in_bounds(f, r) {
+                    continue;
+                }
+                let to = Square::new(f as u8, r as u8);
+                match board.get(to) {
+                    None => moves.push(Move::new(from, to)),
+                    Some(occupant) if occupant.color != color => moves.push(Move::new(from, to)),
+                    _ => {}
+                }
+            }
+        }
+    }
 }
 
 /// Pawn pushes (single and double), diagonal captures, and en passant.
@@ -97,10 +152,52 @@ mod tests {
     use crate::board::Piece;
 
     #[test]
-    fn starting_position_has_sixteen_pawn_moves() {
+    fn starting_position_has_twenty_pseudo_legal_moves() {
+        // 16 pawn moves (8 single + 8 double pushes) + 4 knight moves;
+        // the king and sliding pieces are all boxed in at the start.
         let board = Board::starting_position();
         let moves = pseudo_legal_moves(&board);
-        assert_eq!(moves.len(), 16);
+        assert_eq!(moves.len(), 20);
+    }
+
+    #[test]
+    fn knight_on_empty_board_has_eight_moves() {
+        let mut board = Board::empty();
+        board.set(
+            Square::new(3, 3),
+            Some(Piece {
+                kind: PieceKind::Knight,
+                color: Color::White,
+            }),
+        );
+        let moves = pseudo_legal_moves(&board);
+        assert_eq!(moves.len(), 8);
+    }
+
+    #[test]
+    fn king_cannot_capture_its_own_piece() {
+        let mut board = Board::empty();
+        board.set(
+            Square::new(4, 4),
+            Some(Piece {
+                kind: PieceKind::King,
+                color: Color::White,
+            }),
+        );
+        board.set(
+            Square::new(4, 5),
+            Some(Piece {
+                kind: PieceKind::Pawn,
+                color: Color::White,
+            }),
+        );
+        let moves = pseudo_legal_moves(&board);
+        let king_moves: Vec<_> = moves
+            .iter()
+            .filter(|m| m.from == Square::new(4, 4))
+            .collect();
+        assert_eq!(king_moves.len(), 7);
+        assert!(!king_moves.iter().any(|m| m.to == Square::new(4, 5)));
     }
 
     #[test]
