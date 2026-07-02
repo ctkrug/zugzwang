@@ -544,6 +544,32 @@ mod tests {
     }
 
     #[test]
+    fn legal_moves_from_starting_position_is_twenty() {
+        let board = Board::starting_position();
+        assert_eq!(legal_moves(&board).len(), 20);
+    }
+
+    #[test]
+    fn legal_moves_excludes_moves_that_leave_own_king_in_check() {
+        // White king on e1, a white knight pinned on e4 by a black rook on
+        // e8. A knight can never move without leaving the e-file, so every
+        // pseudo-legal knight move here is illegal.
+        let board = Board::from_fen("4r3/8/8/8/4N3/8/8/4K3 w - - 0 1").unwrap();
+        let moves = legal_moves(&board);
+        assert!(!moves.iter().any(|m| m.from == Square::new(4, 3)));
+    }
+
+    #[test]
+    fn legal_moves_excludes_king_stepping_into_check() {
+        let board = Board::from_fen("4k3/8/8/8/8/8/8/4KR2 b - - 0 1").unwrap();
+        let moves = legal_moves(&board);
+        // Black king on e8 must not step to f8, attacked by the white rook.
+        assert!(!moves
+            .iter()
+            .any(|m| m.from == Square::new(4, 7) && m.to == Square::new(5, 7)));
+    }
+
+    #[test]
     fn castling_available_when_squares_clear_and_safe() {
         let board = Board::from_fen("r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1").unwrap();
         let moves = pseudo_legal_moves(&board);
