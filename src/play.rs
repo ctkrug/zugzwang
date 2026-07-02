@@ -124,6 +124,25 @@ mod tests {
     }
 
     #[test]
+    fn apply_human_move_promotes_a_pawn_when_asked() {
+        let board = Board::from_fen("k7/4P3/8/8/8/8/8/4K3 w - - 0 1").unwrap();
+        let next = apply_human_move(&board, "e7e8q").unwrap();
+        assert_eq!(
+            next.get(crate::square::Square::new(4, 7)).unwrap().kind,
+            crate::types::PieceKind::Queen
+        );
+    }
+
+    #[test]
+    fn apply_human_move_rejects_a_promotion_missing_its_piece_letter() {
+        // The move itself (e7e8) is legal shaped, but a pawn reaching the
+        // back rank must promote — the bare from/to pair with no
+        // promotion letter doesn't match any of the four generated moves.
+        let board = Board::from_fen("k7/4P3/8/8/8/8/8/4K3 w - - 0 1").unwrap();
+        assert!(apply_human_move(&board, "e7e8").is_err());
+    }
+
+    #[test]
     fn engine_reply_plays_a_legal_move() {
         let board = Board::starting_position();
         let (mv, next) = engine_reply(&board).unwrap();
